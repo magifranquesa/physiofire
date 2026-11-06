@@ -147,18 +147,24 @@ Después, solo si la decisión es seguir: réplica de Tang, LFMC, modelo predict
 Obligatorias en las tareas 5 y 6. Evitan una antelación artificial por fuga de datos posteriores al incendio. El suavizado centrado (15 días y 3 × 3) se mantiene solo para mapas descriptivos.
 
 1. **Sin fuga posincendio por el suavizado.**
-   - En cada celda quemada, enmascarar todos los datos desde su fecha de quemado (día 0, incluido) *antes* de calcular tendencias, ciclos estacionales, filtros o cualquier suavizado. Esto también saca de la climatología de la celda los años posteriores al incendio.
+   - Enmascarar los datos desde la fecha de enmascarado (la ignición del incendio en el análisis principal, el día 0 de la celda en el complementario y en la climatología) *antes* de calcular tendencias, ciclos estacionales, filtros o cualquier suavizado. Esto también saca de la climatología de la celda los años posteriores al incendio.
    - En el análisis de época, usar solo ventanas hacia atrás, que terminen en el día evaluado.
    - Ningún suavizado espacial a 0,25° (3 × 3 son unos 75 km). A 0,05°, como mucho 3 × 3 y siempre después de enmascarar cada celda desde su propio día 0.
 2. **Sin fuga en fPAR ni en NBAR.**
-   - **fPAR:** cortar la serie de compuestos en la fecha de quemado *antes* de interpolar a diario, quitando todo compuesto cuyo periodo termine en o después del día 0.
-   - **NBAR de MCD43A4:** cada fecha usa una ventana de 16 días de observaciones; hay que verificar cómo se sitúa y, en principio, enmascarar desde el día 0 − 8.
-   - **Competidor óptico diario:** añadir un NDVI/EVI diario sin ajuste BRDF (MOD09GA/MYD09GA en GEE, con filtro de nubes y de ángulos) como competidor principal de SIF/APAR.
+   - **fPAR:** cortar la serie de compuestos en la fecha de enmascarado *antes* de interpolar a diario, quitando todo compuesto cuyo periodo termine en o después de esa fecha.
+   - **Final de la serie de fPAR:** tras el último compuesto válido, repetir su valor como máximo 5 días (persistencia). Dejar esos días sin dato es una prueba de sensibilidad.
+   - **NBAR de MCD43A4:** cada fecha usa 16 días de observaciones, ponderadas hacia el día 9 (de *t* − 8 a *t* + 7). Enmascarar desde el día 0 − 8.
+   - **Competidor óptico diario:** añadir un NDVI/EVI diario sin ajuste BRDF (MOD09GA/MYD09GA en GEE, cada plataforma por separado, con filtro de nubes y de ángulos) como competidor principal de SIF/APAR.
+   - **Deriva orbital:** documentar la deriva de Terra (hacia las ~9:00) y de Aqua (hacia las ~15:50).
    - Documentar en el borrador la ventana temporal efectiva de cada producto.
-3. **Día 0 por celda, no por incendio.**
-   - El día 0 de cada celda es su fecha de quemado: la primera detección VIIRS dentro de la celda y del perímetro o, si no la hay, la primera fecha de MCD64A1 en la celda. No es la ignición del incendio.
-   - Un incendio grande aporta varias celdas, cada una con su propio día 0.
-   - Los días entre la ignición del incendio y el día 0 de la celda se marcan (incendio activo cerca, humo).
+3. **Alineación por ignición en el análisis principal; día 0 por celda como complemento.**
+   - El día 0 del análisis principal es la ignición de cada incendio. Todas las celdas del incendio se enmascaran desde la fecha de ignición, incluida, de modo que ningún dato de la ventana previa está afectado por ese incendio, ni por quemado ni por humo.
+   - El día 0 por celda (primera detección VIIRS dentro de la celda y del perímetro o, si no la hay, MCD64A1) sirve para dos cosas:
+     - (a) enmascarar las celdas quemadas en la climatología y en los controles, solo si su fracción quemada supera un umbral propio de cada escala, para que un incendio pequeño no elimine una celda de 0,25° entera;
+     - (b) un análisis complementario alineado por celda, marcando los días con humo entre la ignición y el día 0 de la celda.
+   - **Criterios de selección añadidos:**
+     - un mínimo de temporadas válidas antes del incendio en sus celdas, para que la climatología esté definida;
+     - ninguna celda quemada en los 5 años anteriores (recuperación posincendio, incluidos los grandes incendios de 2017).
 4. **Sin filtro de percentiles global.**
    - No usar el filtro de percentiles 1–99 calculado sobre todas las celdas y días, porque puede eliminar justo el estrés extremo de 2025.
    - Usarlo en su lugar: filtros de validez de las entradas (fPAR, PAR y número de píxeles mínimos) más un filtro robusto por celda que solo quite picos aislados.

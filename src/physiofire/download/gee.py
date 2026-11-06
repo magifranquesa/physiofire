@@ -12,6 +12,9 @@ Products:
     shortwave   ERA5-Land daily downward shortwave (W m-2), bilinear; PROVISIONAL PAR source
     shortwave_monthly_1deg  monthly ERA5-Land shortwave on the 1 deg CERES grid (CERES jump test)
     burned      MCD64A1 burned fraction (only to keep generic QC points out of burned cells)
+    burn_history  yearly MCD64A1 burned fraction and first burn day per cell (masks, 5-year criterion)
+    mod09ga / myd09ga  daily Terra / Aqua surface reflectance (not BRDF-adjusted), screened; daily NDVI/EVI
+                competitor (epoch rule 2)
 
 Authentication: gcloud application-default credentials with the Earth Engine scope (see README).
 
@@ -120,6 +123,30 @@ def nbar_images(gcfg: dict, start: dt.date, end: dt.date) -> ee.ImageCollection:
     return ee.ImageCollection(n["collection"]).filterDate(str(start), str(end + dt.timedelta(days=1))).map(prep)
 
 
+def _bits(img: ee.Image, start: int, n: int) -> ee.Image:
+    return img.rightShift(start).bitwiseAnd((1 << n) - 1)
+
+
+def sr_images(gcfg: dict, product: str, start: dt.date, end: dt.date) -> ee.ImageCollection:
+    """Daily MOD09GA/MYD09GA red/NIR/blue surface reflectance (not BRDF-adjusted), screened for clouds,
+    shadows, cirrus, adjacency, snow, high aerosol, water, poor quality and view zenith (see config)."""
+    vza_max = float(gcfg["sr_max_sensor_zenith"])
+
+    def prep(img):
+        st = img.select("state_1km")
+        clear = (_bits(st, 0, 2).eq(0).And(_bits(st, 2, 1).eq(0)).And(_bits(st, 3, 3).eq(1))
+                 .And(_bits(st, 6, 2).neq(3)).And(_bits(st, 8, 2).eq(0)).And(_bits(st, 10, 1).eq(0))
+                 .And(_bits(st, 13, 1).eq(0)).And(_bits(st, 15, 1).eq(0)))
+        good = _bits(img.select("QC_500m"), 0, 2).lte(1)
+        vza = img.select("SensorZenith").multiply(0.01).lte(vza_max)
+        ok = clear.And(good).And(vza)
+        bands = [img.select(b).multiply(0.0001).updateMask(ok).rename(k) for k, b in gcfg["sr_bands"].items()]
+        return ee.Image(bands).copyProperties(img, ["system:time_start"])
+
+    return (ee.ImageCollection(gcfg[product]["collection"])
+            .filterDate(str(start), str(end + dt.timedelta(days=1))).map(prep))
+
+
 def _collection_dates(col: ee.ImageCollection) -> list[int]:
     return col.aggregate_array("system:time_start").getInfo()
 
@@ -127,7 +154,12 @@ def _collection_dates(col: ee.ImageCollection) -> list[int]:
 def run_timeseries(product: str, cfg: dict, start: dt.date, end: dt.date) -> None:
     gcfg = cfg["gee"]
     fine = grid_from_config(cfg, gcfg["fetch_grid"])
-    col = fpar_images(gcfg, start, end) if product == "fpar" else nbar_images(gcfg, start, end)
+    if product == "fpar":
+        col = fpar_images(gcfg, start, end)
+    elif product == "nbar":
+        col = nbar_images(gcfg, start, end)
+    else:
+        col = sr_images(gcfg, product, start, end)
     times = _collection_dates(col)
     imgs = col.toList(len(times))
     log.info("%s: %d images", product, len(times))
@@ -330,10 +362,59 @@ def run_burned(cfg: dict, start: dt.date, end: dt.date) -> None:
         log.info("wrote %s", out.relative_to(REPO_ROOT))
 
 
+def run_burn_history(cfg: dict, y0: int, y1: int) -> None:
+    """Yearly MCD64A1 burn history per cell: burned fraction and first burn date (day of year).
+    Used for the climatology/control masks (burned fraction above a threshold) and for the
+    'no burn in the previous 5 years' selection criterion."""
+    gcfg = cfg["gee"]
+    fine = grid_from_config(cfg, gcfg["fetch_grid"])
+    mx = int(gcfg["max_pixels"])
+    tr = [fine.res, 0, fine.lon_min, 0, -fine.res, fine.lat_max]
+    years = list(range(y0, y1 + 1))
+    frac, first = [], []
+    for y in years:
+        col = ee.ImageCollection(gcfg["burned"]["collection"]).filterDate(f"{y}-01-01", f"{y + 1}-01-01")
+        native = col.first().projection()
+        bd = col.select("BurnDate")
+        burned = bd.max().gt(0).unmask(0).rename("burned").setDefaultProjection(native)
+        doy = bd.map(lambda i: i.updateMask(i.gt(0))).min().rename("doy").setDefaultProjection(native)
+        f = fetch(burned.reduceResolution(ee.Reducer.mean(), maxPixels=mx).reproject(crs="EPSG:4326", crsTransform=tr),
+                  fine)["burned"]
+        d = fetch(doy.reduceResolution(ee.Reducer.min(), maxPixels=mx).reproject(crs="EPSG:4326", crsTransform=tr)
+                  .unmask(0), fine)["doy"]
+        frac.append(np.nan_to_num(f, nan=0.0))
+        first.append(np.where(d > 0, d, np.nan))
+        log.info("burn history %d fetched", y)
+    frac, first = np.stack(frac), np.stack(first)
+    out_dir = REPO_ROOT / gcfg["out_dir"]
+    for gname in cfg["grids"]:
+        grid = grid_from_config(cfg, gname)
+        k = int(round(grid.res / fine.res))
+        if k == 1:
+            fr, fd = frac, first
+        else:
+            shp = (len(years), grid.ny, k, grid.nx, k)
+            fr = frac.reshape(shp).mean(axis=(2, 4))
+            with np.errstate(all="ignore"):
+                import warnings
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore", RuntimeWarning)
+                    fd = np.nanmin(first.reshape(shp), axis=(2, 4))
+        ds = xr.Dataset({"burned_fraction": (("year", "lat", "lon"), fr.astype("f4")),
+                         "first_burn_doy": (("year", "lat", "lon"), fd.astype("f4"))},
+                        coords={"year": years, "lat": grid.lat, "lon": grid.lon})
+        ds["burned_fraction"].attrs = {"long_name": "fraction of cell burned during the year (MCD64A1)"}
+        ds["first_burn_doy"].attrs = {"long_name": "earliest MCD64A1 burn day of year in the cell (NaN = none)"}
+        ds.attrs = {"source": gcfg["burned"]["collection"], "resolution_deg": grid.res}
+        out = out_dir / f"burn_history_{gname}_{y0}_{y1}.nc"
+        ds.to_netcdf(out)
+        log.info("wrote %s", out.relative_to(REPO_ROOT))
+
+
 def main(argv=None) -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("product", choices=["fpar", "nbar", "landcover", "mask", "shortwave", "shortwave_monthly_1deg",
-                                       "burned"])
+    p.add_argument("product", choices=["fpar", "nbar", "mod09ga", "myd09ga", "landcover", "mask", "shortwave",
+                                       "shortwave_monthly_1deg", "burned", "burn_history"])
     p.add_argument("--start", type=dt.date.fromisoformat)
     p.add_argument("--end", type=dt.date.fromisoformat)
     p.add_argument("--year", type=int)
@@ -341,8 +422,11 @@ def main(argv=None) -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     cfg = load_config()
     initialize(cfg["gee"]["project"])
-    if args.product in ("fpar", "nbar"):
+    if args.product in ("fpar", "nbar", "mod09ga", "myd09ga"):
         run_timeseries(args.product, cfg, args.start, args.end)
+    elif args.product == "burn_history":
+        y0, y1 = cfg["gee"]["burn_history_years"]
+        run_burn_history(cfg, int(y0), int(y1))
     elif args.product == "landcover":
         run_landcover(cfg, args.year)
     elif args.product == "shortwave":

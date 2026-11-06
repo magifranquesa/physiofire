@@ -37,6 +37,11 @@ def evi(red, nir, blue):
     return 2.5 * (nir - red) / (nir + 6 * red - 7.5 * blue + 1)
 
 
+def nirv(red, nir):
+    """NIRv as in Tang et al. (2026), Eq. 2: (NDVI - 0.08) x NIR (0.08 removes the soil background)."""
+    return (ndvi(red, nir) - 0.08) * nir
+
+
 def sif_apar(sif, par, fpar):
     """Apparent fluorescence yield, Tang et al. (2026), Eq. 6."""
     return sif / (par * fpar)
@@ -54,11 +59,53 @@ def clip_percentiles(da: xr.DataArray, lo: float, hi: float) -> tuple[xr.DataArr
 
 def composites_to_daily(da: xr.DataArray, centers: np.ndarray, days: np.ndarray, max_gap_days: float) -> xr.DataArray:
     """Linear interpolation of composites (dim `time`, centred at `centers`) to daily values at `days`
-    (assigned to midday). Gaps up to `max_gap_days` between valid composites are bridged."""
+    (assigned to midday). Gaps up to `max_gap_days` between valid composites are bridged.
+    DESCRIPTIVE use only: it uses composites after each day (see `composites_to_daily_cut`)."""
     x = da.assign_coords(time=centers)
     x = x.interpolate_na("time", method="linear", max_gap=np.timedelta64(int(max_gap_days * 86400), "s"))
     out = x.interp(time=days + np.timedelta64(12, "h"))
     return out.assign_coords(time=days)
+
+
+def composites_to_daily_cut(da: xr.DataArray, starts: np.ndarray, centers: np.ndarray, days: np.ndarray,
+                            cutoff: np.ndarray, period_days: int, max_gap_days: float,
+                            persist_days: float | None) -> xr.DataArray:
+    """Daily values from composites with a per-cell cut-off date, for the epoch analysis (no post-fire leakage).
+
+    da       composites, dims (time, lat, lon)
+    starts   composite start dates (time); a composite covers start .. start + period_days - 1
+    centers  composite centre times (time)
+    cutoff   datetime64[D] array (lat, lon): masking date of each cell (NaT = never masked)
+    1. Composites whose period ends on or after the cell's cut-off are removed.
+    2. Remaining composites are interpolated linearly (gaps <= max_gap_days), as in `composites_to_daily`.
+    3. Where that leaves no value (after the last valid composite, or in longer gaps), the last valid
+       composite is carried forward for at most `persist_days` (None = no persistence).
+    4. All days on or after the cut-off are set to missing.
+    """
+    starts = np.asarray(starts, dtype="datetime64[D]")
+    ends = starts + np.timedelta64(period_days - 1, "D")
+    cut = np.asarray(cutoff, dtype="datetime64[D]")
+    cut = np.where(np.isnat(cut), np.datetime64("2262-01-01"), cut)
+    keep = ends[:, None, None] < cut[None, :, :]
+    comp = da.copy(data=np.where(keep, da.values, np.nan))
+    daily = composites_to_daily(comp, centers, days, max_gap_days)
+
+    if persist_days is not None:
+        vals = comp.values
+        valid = np.isfinite(vals)
+        idx = np.where(valid, np.arange(vals.shape[0])[:, None, None], -1)
+        last_valid = np.maximum.accumulate(idx, axis=0)                      # latest valid composite index
+        tmid = days.astype("datetime64[ns]") + np.timedelta64(12, "h")
+        k = np.searchsorted(np.asarray(centers, dtype="datetime64[ns]"), tmid, side="right") - 1
+        lv = np.where(k[:, None, None] >= 0, last_valid[np.clip(k, 0, None)], -1)      # (day, lat, lon)
+        lv_safe = np.clip(lv, 0, None)
+        last_val = np.take_along_axis(vals, lv_safe, axis=0)
+        age = (tmid[:, None, None] - np.asarray(centers, dtype="datetime64[ns]")[lv_safe]) / np.timedelta64(1, "D")
+        fill = (lv >= 0) & np.isnan(daily.values) & (age <= persist_days)
+        daily = daily.copy(data=np.where(fill, last_val, daily.values))
+
+    after = days.astype("datetime64[D]")[:, None, None] >= cut[None, :, :]
+    return daily.copy(data=np.where(after, np.nan, daily.values))
 
 
 # --------------------------------------------------------------------------- chain
@@ -85,6 +132,8 @@ def build(cfg: dict, start: dt.date, end: dt.date) -> None:
     ndvi_f = ndvi(nb.red, nb.nir).where(nb_valid)
     evi_f = evi(nb.red, nb.nir, nb.blue).where(nb_valid)
     evi_f = evi_f.where((evi_f >= 0) & (evi_f <= 1))          # Tang et al.: keep EVI in [0, 1]
+    nirv_f = nirv(nb.red, nb.nir).where(nb_valid)
+    nirv_f = nirv_f.where((nirv_f >= 0) & (nirv_f <= 1))      # Tang et al.: keep NIRv in [0, 1]
     w_f = nb.red_count.where(nb_valid, 0.0)
 
     for gname in cfg["grids"]:
@@ -103,38 +152,46 @@ def build(cfg: dict, start: dt.date, end: dt.date) -> None:
         fpar_d = composites_to_daily(fp.fpar.where(fp.fpar_count > 0), fp.time_center.values, days,
                                      float(acfg["fpar_max_gap_days"]))
 
-        if factor == 1:
-            ndvi_g, evi_g = ndvi_f, evi_f
-        else:
-            m, _ = block_mean(ndvi_f.values, w_f.values, factor)
-            ndvi_g = xr.DataArray(m, coords={"time": days, "lat": grid.lat, "lon": grid.lon}, dims=("time", "lat", "lon"))
-            m, _ = block_mean(evi_f.values, w_f.where(evi_f.notnull(), 0.0).values, factor)
-            evi_g = xr.DataArray(m, coords=ndvi_g.coords, dims=ndvi_g.dims)
+        idx = {}
+        for name, x in [("ndvi", ndvi_f), ("evi", evi_f), ("nirv", nirv_f)]:
+            if factor == 1:
+                idx[name] = x
+            else:
+                m, _ = block_mean(x.values, w_f.where(x.notnull(), 0.0).values, factor)
+                idx[name] = xr.DataArray(m, coords={"time": days, "lat": grid.lat, "lon": grid.lon},
+                                         dims=("time", "lat", "lon"))
 
         coords = {"time": days, "lat": grid.lat, "lon": grid.lon}
         s = sif.sif.where(mask)
         p = par.assign_coords(coords).where(mask)
         f = fpar_d.assign_coords(coords).where(mask)
-        ratio_apar, a_lo, a_hi = clip_percentiles(sif_apar(s, p, f), *acfg["clip_percentiles"])
-        ratio_par, p_lo, p_hi = clip_percentiles(sif_par(s, p), *acfg["clip_percentiles"])
+        nv = idx["nirv"].assign_coords(coords).where(mask)
 
+        # Ratios are stored UNFILTERED: outlier screening (validity thresholds + per-cell robust filter)
+        # is applied in the anomaly stage, after post-fire masking (CLAUDE.md, epoch rule 4).
         ds = xr.Dataset({
             "sif": s, "sif_sem": sif.sif_sem.where(mask), "sif_weight": sif.weight_sum.where(mask),
             "par": p, "fpar": f, "apar": p * f,
-            "sif_apar": ratio_apar, "sif_par": ratio_par,
-            "ndvi": ndvi_g.assign_coords(coords).where(mask), "evi": evi_g.assign_coords(coords).where(mask),
+            "sif_apar": sif_apar(s, p, f), "sif_par": sif_par(s, p),
+            "sif_apar_nirv": s / (p * nv), "sif_nirv": s / nv,
+            "ndvi": idx["ndvi"].assign_coords(coords).where(mask), "evi": idx["evi"].assign_coords(coords).where(mask),
+            "nirv": nv,
             "land_fraction": _open(gee_dir / f"mask_peninsula_{gname}.nc").land_fraction,
         })
         units = {"sif": "mW m-2 sr-1 nm-1", "sif_sem": "mW m-2 sr-1 nm-1", "par": "W m-2", "apar": "W m-2",
                  "fpar": "1", "sif_apar": "mW m-2 sr-1 nm-1 / (W m-2)", "sif_par": "mW m-2 sr-1 nm-1 / (W m-2)",
-                 "ndvi": "1", "evi": "1"}
+                 "sif_apar_nirv": "mW m-2 sr-1 nm-1 / (W m-2)", "sif_nirv": "mW m-2 sr-1 nm-1",
+                 "ndvi": "1", "evi": "1", "nirv": "1"}
         for v, u in units.items():
             ds[v].attrs["units"] = u
         ds["par"].attrs.update(long_name="PAR (PROVISIONAL: par_fraction x ERA5-Land downward shortwave)",
                                par_fraction=float(pcfg["par_fraction"]), provisional=1)
-        ds["sif_apar"].attrs.update(long_name="SIF / (PAR x fPAR), clipped to percentiles",
-                                    clip_low=a_lo, clip_high=a_hi, clip_percentiles=np.array(acfg["clip_percentiles"]))
-        ds["sif_par"].attrs.update(long_name="SIF / PAR, clipped to percentiles", clip_low=p_lo, clip_high=p_hi)
+        ds["fpar"].attrs.update(long_name="daily fPAR, centred interpolation of composites (DESCRIPTIVE ONLY; "
+                                          "epoch analysis rebuilds it with composites_to_daily_cut)")
+        ds["sif_apar"].attrs.update(long_name="SIF / (PAR x fPAR), unfiltered")
+        ds["sif_par"].attrs.update(long_name="SIF / PAR, unfiltered")
+        ds["sif_apar_nirv"].attrs.update(long_name="SIF / (PAR x NIRv), unfiltered (sensitivity)")
+        ds["sif_nirv"].attrs.update(long_name="SIF / NIRv, unfiltered (sensitivity)")
         ds.attrs = {"title": "PHYSIOFIRE SIF/APAR chain (sample period)", "resolution_deg": grid.res,
                     "par_source": pcfg["source"], "par_provisional": int(bool(pcfg["provisional"])),
                     "sif_source": "TROPOSIF L2B SIF_Corr_743, footprint-weighted",
@@ -142,7 +199,7 @@ def build(cfg: dict, start: dt.date, end: dt.date) -> None:
                     "Conventions": "CF-1.8"}
         out = out_dir / f"sif_apar_{gname}_{tag}.nc"
         ds.to_netcdf(out, encoding={v: {"zlib": True, "complevel": 4} for v in ds.data_vars})
-        log.info("wrote %s (SIF/APAR clip %.4g-%.4g)", out.relative_to(REPO_ROOT), a_lo, a_hi)
+        log.info("wrote %s", out.relative_to(REPO_ROOT))
 
 
 def main(argv=None) -> None:

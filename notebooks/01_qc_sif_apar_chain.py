@@ -131,9 +131,9 @@ def main(argv=None) -> None:
     for gname, ds in [("base", dsb), ("fine", dsf)]:
         maps(ds, gname, out_dir, period)
         v = ds.sel(time=period)
+        q = np.nanpercentile(v.sif_apar.values, [1, 99])
         print(f"{gname}: SIF/APAR valid fraction (land) {float(v.sif_apar.notnull().where(v.land_fraction >= 0.5).mean()):.2f}"
-              f" | clip {ds.sif_apar.attrs['clip_low']:.4g}-{ds.sif_apar.attrs['clip_high']:.4g}"
-              f" | median SIF/APAR {float(v.sif_apar.median()):.4g}")
+              f" | unfiltered p1-p99 {q[0]:.4g}-{q[1]:.4g} | median SIF/APAR {float(v.sif_apar.median()):.4g}")
 
     pts = select_points(cfg, tag_burned)
     pts.to_csv(out_dir / "qc_points.csv", index=False)

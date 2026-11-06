@@ -92,18 +92,23 @@ MODIS products were aggregated in Google Earth Engine (Gorelick et al., 2017) to
 
 **fPAR.** fPAR from MCD15A3H (Myneni et al., 2002) was retained only for retrievals of the main (radiative transfer) algorithm (SCF_QC, bits 5–7 of `FparLai_QC`, ≤ 1) and valid range (≤ 100 before scaling). Each 4-day composite was assigned to its central time (start + 1.5 days). Daily values were obtained by linear interpolation between composite centres, bridging gaps of up to 12 days, as in Tang et al. (2026).
 
-**[Planned] Burn-date cut-off for fPAR (epoch analysis).** For the epoch analysis, the fPAR series of each burned cell is cut at the cell's burn date $d_c$ (Section 2.11) *before* interpolation. Any composite whose compositing period ends on or after $d_c$ (start + 3 days ≥ $d_c$) is removed, so that no post-fire composite enters the daily values of the pre-fire window. Between the last pre-fire composite centre and $d_c$, values are left missing **[TODO: or carried forward from the last composite for at most 4 days]**. The uncut series is kept only for descriptive maps.
+**[Planned] Cut-off for fPAR (epoch analysis).** For the epoch analysis, the fPAR series of each fire cell is cut at the masking date (the fire ignition $d_f$ in the main analysis, $d_c$ in the per-cell analysis; Section 2.11) *before* interpolation. Any composite whose compositing period ends on or after that date (start + 3 days ≥ cut-off) is removed, so that no post-fire composite enters the daily values of the pre-fire window. After the last valid composite centre, the last value is carried forward for at most 5 days (persistence of the last available datum). This uses no future information and mimics what an operational system would do; leaving those days missing would remove SIF/APAR precisely on the days closest to the fire. Leaving them missing is kept as a sensitivity test. The uncut series is used only for descriptive maps.
 
 **Optical indices.** MCD43C4, used by Tang et al. (2026), is not available in GEE. We therefore aggregated its 500 m counterpart, MCD43A4 nadir BRDF-adjusted reflectance (NBAR; Schaaf et al., 2002), to 0.05°. MCD43C4 is itself derived from this aggregation. We kept reflectances with mandatory quality ≤ 1 (full or magnitude BRDF inversion). NDVI and EVI (Huete et al., 2002) were computed at 0.05° from cell-mean red ($R$), near-infrared (NIR) and blue ($B$) reflectances, using the EVI formulation of Tang et al. (2026):
 $$\mathrm{NDVI}=\frac{\mathrm{NIR}-R}{\mathrm{NIR}+R},\qquad
 \mathrm{EVI}=2.5\,\frac{\mathrm{NIR}-R}{\mathrm{NIR}+6R-7.5B+1}. \tag{4}$$
 EVI values outside [0, 1] were discarded. 0.25° indices were obtained as count-weighted means of the 0.05° indices, mirroring the resampling of indices from 0.05° to 0.25° in Tang et al. (2026).
 
-**[Planned] Temporal footprint of NBAR and a daily optical competitor.** MCD43A4 NBAR for a nominal date is retrieved from a 16-day window of multi-angular observations around that date **[TODO: verify window placement in the MCD43 C6.1 user guide; nominal date expected to be the 9th day, i.e. observations from $t-8$ to $t+7$]**. This has two consequences for the epoch analysis:
+**[Planned] Temporal footprint of NBAR and a daily optical competitor.** MCD43A4 v061 NBAR for a nominal date is retrieved from 16 days of Terra and Aqua observations, temporally weighted to the ninth day of the period, which is the date of the product. A value dated $t$ therefore uses observations from $t-8$ to $t+7$ (LP DAAC product description **[TODO: cite MCD43 C6.1 user guide]**). This has two consequences for the epoch analysis:
 - NBAR dates within about 8 days before a burn date contain post-fire observations; in the epoch analysis they are masked ($t \ge d_c - 8$).
 - The window delays and smooths the optical response, which would artificially favour SIF/APAR in a lead-time comparison.
 
-We therefore add a daily, non-BRDF-adjusted NDVI/EVI from MODIS surface reflectance (MOD09GA, Terra, and MYD09GA, Aqua; collection 6.1, in GEE). It is screened with the `state_1km` flags (cloud, cloud shadow, cirrus, adjacency) and limited to sensor zenith angles ≤ 40° **[TODO: thresholds]**, and it is aggregated to the same grids. It is used as the main optical competitor in the lead-time analysis, with MCD43A4 as a secondary reference.
+We therefore add a daily, non-BRDF-adjusted NDVI/EVI from MODIS surface reflectance (MOD09GA, Terra, and MYD09GA, Aqua; collection 6.1, in GEE), processed separately for each platform.
+- **Screening:** `state_1km` flags for clear sky, no cloud shadow, no cirrus, no internal cloud, not adjacent to cloud, no snow and not high aerosol **[TODO: verify bit definitions in the MOD09 user guide]**; `QC_500m` MODLAND quality ≤ 1; sensor zenith ≤ 40°.
+- **Aggregation:** to the same grids.
+- **Role:** main optical competitor in the lead-time analysis, with MCD43A4 as a secondary reference.
+
+**Orbital drift.** Both platforms have drifted freely since their last manoeuvres (Terra in February 2020, Aqua in December 2021). Terra's local overpass time moves earlier, to about 09:00 by late 2025, from a nominal 10:30. Aqua's moves later, to about 15:50 by August 2026, from a nominal 13:30. During the 2025 case, Aqua no longer overpasses at the TROPOMI time (~13:30), and illumination geometry changes along the record, which can introduce trends in non-BRDF-adjusted indices. The LOESS detrending (Section 2.8) partly absorbs these trends. The mean overpass time per year over the region will be reported from `SolarZenith`/granule times **[TODO]**, and the platforms' end-of-mission status will be confirmed **[TODO: GEE holds MOD09GA/MYD09GA up to November 2026]**.
 
 **[Planned] Effective temporal window of each product.** The temporal support of each input (Table 2) is reported, because it bounds the lead time that each variable can show.
 
@@ -114,7 +119,7 @@ We therefore add a daily, non-BRDF-adjusted NDVI/EVI from MODIS surface reflecta
 | SIF | TROPOSIF L2B | single overpass (~13:30 local solar time), day-length corrected |
 | fPAR | MCD15A3H | 4-day composite* (best retrieval within the period), linearly interpolated between composite centres |
 | NBAR NDVI/EVI | MCD43A4 | 16-day multi-angular retrieval window* |
-| Daily NDVI/EVI | MOD09GA/MYD09GA | single overpass (Terra ~10:30, Aqua ~13:30, both drifting at end of mission) |
+| Daily NDVI/EVI | MOD09GA/MYD09GA | single overpass; nominal Terra 10:30 / Aqua 13:30, drifted to about 09:00 / 15:30–15:50 by 2025–2026 |
 | PAR, AED | ERA5-Land | daily aggregate (00–24 UTC) |
 | FWI | CEMS (ERA5) | daily at 12:00 local time; the DMC and DC subindices carry multi-week memory of *past* weather by design |
 | Smoothing | all | trailing window of $w$ days (Section 2.8), i.e. a lag of about $(w-1)/2$ days applied equally to all variables |
@@ -143,7 +148,7 @@ Ratio values are not clipped at a lower percentile, because negative SIF retriev
 
 As a diagnostic, we will report the fraction of data in the pre-fire windows of fire cells, and in matched control windows, that the pooled filter would have removed, as a function of day relative to $d_c$. A concentration of removals in the days before burning in fire cells, but not in controls, would indicate that the pooled filter biases the comparison.
 
-**[Planned] Sensitivity to the structural normalisation.** MCD15A3H fPAR is the fraction absorbed by the whole canopy, not by chlorophyll. In Mediterranean summers part of a decrease in SIF/APAR can therefore reflect pigment loss rather than a change in fluorescence yield. As a sensitivity test, we also compute SIF/(PAR × NIRv) and SIF/NIRv, with NIRv = NDVI × NIR as in Tang et al. (2026), Eq. 2.
+**[Planned] Sensitivity to the structural normalisation.** MCD15A3H fPAR is the fraction absorbed by the whole canopy, not by chlorophyll. In Mediterranean summers part of a decrease in SIF/APAR can therefore reflect pigment loss rather than a change in fluorescence yield. As a sensitivity test, we also compute SIF/(PAR × NIRv) and SIF/NIRv, with NIRv = (NDVI − 0.08) × NIR as in Tang et al. (2026), Eq. 2, where 0.08 removes the soil background contribution. NIRv values outside [0, 1] are discarded.
 
 **[Planned] Sensitivity to PAR timing.** The day-length corrected SIF is compared with daily mean PAR. As a sensitivity test, PAR is also taken at the TROPOMI overpass (~13:30 local solar time) from ERA5-Land hourly shortwave **[TODO: matching of the instantaneous SIF_743 vs SIF_Corr_743]**.
 
@@ -163,7 +168,7 @@ Daily anomalies of SIF/APAR, SIF/PAR, NDVI, EVI, AED and FWI will be computed fo
 **Smoothing window.** The 15-day smoothing limits the attainable lead time. We will repeat the analysis with shorter windows (7 days) at 0.25°, where single-day retrieval errors are smaller (Section 3 **[TODO]**).
 
 **[Planned] Rules that prevent post-fire leakage (epoch analysis).** Centred temporal smoothing and 3 × 3 spatial smoothing would bring post-burn data into the pre-fire window and could create an artificial lead time. For the epoch analysis:
-1. **Masking before any statistic.** In every burned cell, all data from its burn date $d_c$ onwards are masked *before* computing trends, seasonal cycles, filters or any smoothing (Section 2.11). This also keeps the post-fire recovery years of a cell out of its climatology.
+1. **Masking before any statistic.** Data are masked from the masking date onwards *before* computing trends, seasonal cycles, filters or any smoothing (Section 2.11). The masking date is the fire's ignition date $d_f$ for the cells of a fire in the main analysis, and the cell's burn date $d_c$ in the per-cell analysis and for the climatology of any cell burned above $f_\mathrm{clim}$. This also keeps the post-fire recovery years of a cell out of its climatology.
 2. **Trailing windows only.** Temporal smoothing uses trailing windows that end on the evaluated day, $\bar{x}(t) = \mathrm{mean}\{x(t-w+1),\dots,x(t)\}$, with a minimum number of valid days **[TODO]**.
 3. **Spatial smoothing.** No spatial smoothing is applied at 0.25° (3 × 3 cells span about 75 km). At 0.05° a 3 × 3 window may be used as a sensitivity test, always after masking each cell from its own burn date.
 4. **Descriptive use only for centred smoothing.** The centred 15-day × 3 × 3 smoothing of Tang et al. (2026) is used only for descriptive maps.
@@ -198,21 +203,23 @@ Daily anomalies of SIF/APAR, SIF/PAR, NDVI, EVI, AED and FWI will be computed fo
 - a minimum area **[TODO]**, prioritising large fires given the 0.25° scale; the fraction of the 0.25° and 0.05° cells burned will be recorded;
 - a confirmed ignition date;
 - a clear dominant vegetation type;
-- no overlap with other fires within the 60-day pre-fire window.
+- no overlap with other fires within the 60-day pre-fire window;
+- **[Planned]** a minimum number of valid seasons before the fire in each of its cells, so that the climatology is defined **[TODO: number, e.g. 3 seasons with ≥ x% valid days]**;
+- **[Planned]** no cell burned in the five years before the fire (post-fire recovery). This includes the large 2017 fires in Portugal and Galicia; burn history from MCD64A1 (from 2000) and the national maps.
 
 The sample will be balanced across vegetation types (shrubland, woodland, and grassland as a negative control, since cured grasses are dead fuel), countries, regions and years. The selected fires and the criteria each meets will be provided as supplementary material.
 
 ### 2.11. Superposed epoch analysis **[Planned]**
 
-**Day 0 per cell.** The epoch is defined per grid cell, not per fire. Day 0 of a cell, $d_c$, is its burn date:
+**Main alignment: fire ignition date.** In the main analysis, day 0 is the ignition date $d_f$ of each fire. All cells attributed to the fire are masked from $d_f$ (inclusive) onwards, so no datum in the pre-fire window is affected by that fire, either through burning or through its smoke. A cell is attributed to a fire if the burned fraction of the cell (from the perimeter) is at least $f_\mathrm{min}$ **[TODO: threshold at 0.25° and 0.05°]**. The epoch series of each fire is the burned-area-weighted mean over its cells **[TODO: or the cells treated individually with grouping by fire]**, for days $-60$ to $-1$, after applying the masking and trailing-window rules of Section 2.8.
+
+**Burn date per cell.** The burn date of each cell, $d_c$, is:
 - the earliest VIIRS 375 m active-fire detection (S-NPP and NOAA-20, nominal and high confidence **[TODO: confidence rule]**) falling inside both the cell and the fire perimeter;
 - if no such detection exists, the earliest MCD64A1 burn date in the cell.
 
-A cell is attributed to a fire if the burned fraction of the cell (from the perimeter) is at least $f_\mathrm{min}$ **[TODO: threshold at 0.25° and 0.05°]**. A large fire therefore contributes several cells with different day 0 values.
-
-**[TODO] Days between ignition and $d_c$.** For cells that burn several days after the fire's ignition, the days between the two dates are pre-burn for the cell, but the fire is already active nearby (smoke, heat). These days are flagged and excluded in the main analysis **[TODO: confirm]**. An analysis aligned on the fire's ignition date is reported as a complement.
-
-**Epoch series.** For each fire cell, the anomaly series of each variable will be extracted for the 60 days preceding $d_c$ (days $-60$ to $-1$), after applying the masking and trailing-window rules of Section 2.8.
+It is used for two purposes:
+1. **Climatology and controls.** Every cell whose burned fraction exceeds a scale-dependent threshold $f_\mathrm{clim}$ **[TODO: e.g. 10% at 0.25° and 30% at 0.05°]** is masked from $d_c$ onwards when computing climatologies and filters, and is excluded from the control pool. This applies to all fires in the record, not only the selected ones. The threshold prevents a small fire from removing a whole 0.25° cell.
+2. **Complementary analysis aligned per cell**, with day 0 at $d_c$. Days between $d_f$ and $d_c$, when the fire is already active nearby, are flagged as smoke- or heat-affected.
 
 **[Planned] Smoke.** Days with high aerosol loading are flagged in fire and control cells alike, using the TROPOMI UV aerosol index or MODIS AOD, and excluded in a sensitivity test **[TODO: product (e.g. S5P L3 AER_AI or MCD19A2 in GEE) and threshold]**.
 

@@ -52,7 +52,18 @@ gee:
     collection: ECMWF/ERA5_LAND/DAILY_AGGR
     sw_band: surface_solar_radiation_downwards_sum   # J m-2 per day
   burned:
-    collection: MODIS/061/MCD64A1   # only to keep generic QC points away from burned cells
+    collection: MODIS/061/MCD64A1   # QC point screening; yearly burn history (fraction, first burn date)
+  burn_history_years: [2013, 2025]  # 5 years before the TROPOMI record (2018) to the latest case
+  # Daily surface reflectance, NOT BRDF-adjusted: main optical competitor in the epoch analysis.
+  # state_1km bits (MOD09 user guide, to verify): 0-1 cloud state (0 clear), 2 cloud shadow, 3-5 land/water
+  # (1 land), 6-7 aerosol quantity (3 high), 8-9 cirrus (0 none), 10 internal cloud, 13 adjacent to cloud,
+  # 15 internal snow mask. QC_500m bits 0-1 MODLAND QA (0 ideal, 1 less than ideal).
+  sr_bands: {red: sur_refl_b01, nir: sur_refl_b02, blue: sur_refl_b03}
+  sr_max_sensor_zenith: 40
+  mod09ga:
+    collection: MODIS/061/MOD09GA   # Terra; overpass drifting earlier (~09:00 by late 2025)
+  myd09ga:
+    collection: MODIS/061/MYD09GA   # Aqua; overpass drifting later (~15:50 by Aug 2026)
 
 # PAR source. PROVISIONAL: PAR = par_fraction x ERA5-Land daily downward shortwave (daily mean W m-2),
 # until CERES SYN1deg Ed4B is downloaded and the April 2022 discontinuity test is done.
@@ -76,9 +87,16 @@ sif:
   footprint_subsamples: 4        # k x k sub-points per TROPOMI pixel for footprint-weighted gridding
   grid_dir: data/interim/troposif_grid
 sif_apar:
-  clip_percentiles: [1, 99]      # computed on the sample period for now; recompute on the full series
+  clip_percentiles: [1, 99]      # Tang et al. pooled filter: SENSITIVITY ONLY (epoch rule 4); ratios stored unfiltered
   min_land_fraction: 0.5         # cells used: at least this fraction inside mainland Spain + Portugal
   fpar_max_gap_days: 12          # max gap filled when interpolating 4-day fPAR composites to daily
+  fpar_composite_days: 4         # MCD15A3H compositing period (start .. start+3)
+  fpar_persist_days: 5           # epoch analysis: carry last valid composite forward at most this many days
+  screening:                     # applied in the anomaly stage, after post-fire masking [TODO thresholds]
+    fpar_min: null
+    par_min: null
+    sif_weight_min: null
+    robust_k_mad: null
   out_dir: data/processed
 anomalies:
   loess_frac: 0.4          # LOESS window as fraction of the period
