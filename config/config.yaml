@@ -48,6 +48,22 @@ gee:
   boundaries:
     collection: USDOS/LSIB_SIMPLE/2017
     countries: [Spain, Portugal]   # mainland polygon of each kept (Balearics, Canaries, Azores, Madeira out)
+  era5land:
+    collection: ECMWF/ERA5_LAND/DAILY_AGGR
+    sw_band: surface_solar_radiation_downwards_sum   # J m-2 per day
+  burned:
+    collection: MODIS/061/MCD64A1   # only to keep generic QC points away from burned cells
+
+# PAR source. PROVISIONAL: PAR = par_fraction x ERA5-Land daily downward shortwave (daily mean W m-2),
+# until CERES SYN1deg Ed4B is downloaded and the April 2022 discontinuity test is done.
+# par_fraction: PAR/global shortwave energy ratio; typical literature values 0.45-0.50 (reference to be
+# added). A constant factor rescales SIF/APAR uniformly, so it does not change its temporal anomalies'
+# sign or timing, but absolute SIF/APAR values are not comparable with Tang et al. (CERES PAR).
+par:
+  source: era5land_shortwave_fraction   # PROVISIONAL; alternatives: ceres_syn1deg_ed4b
+  par_fraction: 0.48
+  provisional: true
+  ceres_jump_test_grid_deg: 1.0   # CERES SYN1deg native grid
 
 # Parameters taken from Tang et al. (2026), Methods.
 sif:
@@ -60,7 +76,10 @@ sif:
   footprint_subsamples: 4        # k x k sub-points per TROPOMI pixel for footprint-weighted gridding
   grid_dir: data/interim/troposif_grid
 sif_apar:
-  clip_percentiles: [1, 99]
+  clip_percentiles: [1, 99]      # computed on the sample period for now; recompute on the full series
+  min_land_fraction: 0.5         # cells used: at least this fraction inside mainland Spain + Portugal
+  fpar_max_gap_days: 12          # max gap filled when interpolating 4-day fPAR composites to daily
+  out_dir: data/processed
 anomalies:
   loess_frac: 0.4          # LOESS window as fraction of the period
   smooth_days: 15
@@ -69,6 +88,21 @@ anomalies:
 
 epoch:
   window_days: 60          # days before fire start date
+
+# Generic QC points for the task 4 chain check (NOT fire locations). Rule fixed before looking at series.
+# IGBP classes from MCD12C1 (provisional: contrast with CORINE / WorldCover pending, IGBP can confuse
+# Mediterranean shrubland and woodland; woody savannas (8) deliberately excluded).
+qc_points:
+  grid: base
+  landcover_year: 2024
+  min_land_fraction: 0.95
+  burned_period: ["2025-01-01", "2025-09-30"]   # MCD64A1; cell and its 8 neighbours must be unburned
+  classes:
+    woodland:  {igbp: [1, 2, 3, 4, 5], min_percent: 60}
+    shrubland: {igbp: [6, 7], min_percent: 50}
+  n_per_class: 3
+  min_separation_deg: 2.0
+  rolling_days: 15          # smoothing window for the series plots (as in Tang et al.)
 
 sample_period:            # task 4: end-to-end SIF/APAR chain test (60-day window before mid-August fires + margin)
   start: "2025-06-01"

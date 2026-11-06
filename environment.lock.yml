@@ -33,6 +33,7 @@ dependencies:
   - blosc=1.21.7
   - bokeh=3.9.2
   - botocore=1.43.117
+  - bottleneck=1.6.0
   - bounded-pool-executor=0.0.3
   - branca=0.8.2
   - brotli=1.2.1

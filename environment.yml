@@ -12,6 +12,7 @@ dependencies:
   - pandas
   - xarray
   - dask
+  - bottleneck        # xarray interpolate_na with max_gap
   - netcdf4
   - zarr
   - rioxarray

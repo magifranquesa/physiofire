@@ -191,6 +191,8 @@ Stack: Python 3.11 (`environment.yml`) con xarray, dask, rioxarray, zarr, netCDF
 - Si se usa la AED ya calculada por el grupo o se calcula con FAO-56 Penman-Monteith.
 - Superficie mínima y resto de umbrales de selección.
 - Máscara de nieve (ERA5-Land o GlobSnow).
+- Fuente definitiva de PAR: CERES Ed4B o ERA5-Land (serie homogénea y poca latencia), según la prueba del salto de abril de 2022. Mientras tanto, PAR provisional = 0,48 × radiación solar descendente de ERA5-Land.
+- Estratificación por vegetación: contrastar MCD12C1 (IGBP) con CORINE o ESA WorldCover antes de usarlo, porque las clases IGBP pueden confundir matorral y arbolado mediterráneos.
 
 ## Contexto adicional
 

@@ -9,6 +9,9 @@ Products:
     nbar        MCD43A4 red/NIR/blue NBAR, mandatory quality <= max (daily); NDVI/EVI computed later
     landcover   MCD12C1 IGBP (Type 1) class percentages, majority class (yearly, native 0.05 deg)
     mask        fraction of each cell inside mainland Spain + Portugal (LSIB boundaries)
+    shortwave   ERA5-Land daily downward shortwave (W m-2), bilinear; PROVISIONAL PAR source
+    shortwave_monthly_1deg  monthly ERA5-Land shortwave on the 1 deg CERES grid (CERES jump test)
+    burned      MCD64A1 burned fraction (only to keep generic QC points out of burned cells)
 
 Authentication: gcloud application-default credentials with the Earth Engine scope (see README).
 
@@ -36,6 +39,7 @@ from physiofire.preprocess.grid import Grid, grid_from_config
 log = logging.getLogger("gee")
 
 SCOPES = ["https://www.googleapis.com/auth/earthengine", "https://www.googleapis.com/auth/cloud-platform"]
+NODATA = -9999.0  # explicit no-data flag (computePixels returns masked pixels as 0)
 
 
 def initialize(project: str) -> None:
@@ -157,7 +161,8 @@ def write_grids(product, cfg, base_vars, layers, time_coord, start, end, extra_c
         data = {}
         for v in base_vars:
             mean = np.stack(layers[f"{v}_mean"])
-            count = np.stack(layers[f"{v}_count"])
+            count = np.nan_to_num(np.stack(layers[f"{v}_count"]), nan=0.0)
+            mean = np.where(count > 0, mean, np.nan)   # masked cells come back as 0, not as no-data
             if factor > 1:
                 mean, count = block_mean(mean, count, factor)
             data[v] = (("time", "lat", "lon"), mean.astype("f4"))
@@ -236,9 +241,99 @@ def run_mask(cfg: dict) -> None:
         log.info("wrote %s", out.relative_to(REPO_ROOT))
 
 
+def _reproject_bilinear(img: ee.Image, grid: Grid) -> ee.Image:
+    """Bilinear resampling to `grid` (for sources coarser than the grid, e.g. ERA5-Land 0.1 deg)."""
+    return img.resample("bilinear").reproject(
+        crs="EPSG:4326", crsTransform=[grid.res, 0, grid.lon_min, 0, -grid.res, grid.lat_max])
+
+
+def run_shortwave(cfg: dict, start: dt.date, end: dt.date) -> None:
+    """ERA5-Land daily downward shortwave (daily mean W m-2), bilinear to the fetch grid, block means coarser.
+    PROVISIONAL PAR source: PAR = par_fraction x SW is applied later (indices step)."""
+    gcfg = cfg["gee"]
+    e = gcfg["era5land"]
+    fine = grid_from_config(cfg, gcfg["fetch_grid"])
+    col = (ee.ImageCollection(e["collection"]).filterDate(str(start), str(end + dt.timedelta(days=1)))
+           .select(e["sw_band"]))
+    times = _collection_dates(col)
+    imgs = col.toList(len(times))
+    layers: dict[str, list] = {"sw_mean": [], "sw_count": []}
+    for i, t in enumerate(times):
+        img = ee.Image(imgs.get(i)).divide(86400).rename("sw")  # J m-2 day-1 -> W m-2
+        # Masked pixels come back as 0 from computePixels: flag them explicitly.
+        a = fetch(_reproject_bilinear(img, fine).unmask(NODATA), fine)["sw"]
+        a[a <= NODATA + 1] = np.nan
+        layers["sw_mean"].append(a)
+        layers["sw_count"].append(np.isfinite(a).astype("f8"))
+        log.info("sw %s fetched (%d/%d)", dt.datetime.utcfromtimestamp(t / 1000).date(), i + 1, len(times))
+    time_coord = np.array(times, dtype="datetime64[ms]").astype("datetime64[ns]")
+    gcfg = dict(gcfg, shortwave={"collection": f"{e['collection']} {e['sw_band']}"})
+    write_grids("shortwave", dict(cfg, gee=gcfg), ["sw"], layers, time_coord, start, end)
+
+
+def run_shortwave_monthly_1deg(cfg: dict, start: dt.date, end: dt.date) -> None:
+    """Monthly mean ERA5-Land downward shortwave (W m-2) on the 1 deg CERES grid, for the CERES
+    discontinuity test. Area-weighted mean of the 0.1 deg ERA5-Land cells in each 1 deg cell."""
+    gcfg = cfg["gee"]
+    e = gcfg["era5land"]
+    r = cfg["region"]
+    res = float(cfg["par"]["ceres_jump_test_grid_deg"])
+    g1 = Grid(np.floor(r["lon_min"]), np.floor(r["lat_min"]), np.ceil(r["lon_max"]), np.ceil(r["lat_max"]), res)
+    months = []
+    m = dt.date(start.year, start.month, 1)
+    while m <= end:
+        months.append(m)
+        m = dt.date(m.year + (m.month == 12), m.month % 12 + 1, 1)
+    out, cnt = [], []
+    for i, m0 in enumerate(months):
+        m1 = dt.date(m0.year + (m0.month == 12), m0.month % 12 + 1, 1)
+        mcol = ee.ImageCollection(e["collection"]).filterDate(str(m0), str(m1)).select(e["sw_band"])
+        native = mcol.first().projection()  # composites lose the default projection
+        img = mcol.mean().divide(86400).rename("sw").setDefaultProjection(native)
+        a = fetch(_to_grid(img, g1, int(gcfg["max_pixels"])), g1)
+        out.append(np.where(a["sw_count"] > 0, a["sw_mean"], np.nan))
+        cnt.append(a["sw_count"])
+        log.info("sw monthly %s fetched (%d/%d)", m0, i + 1, len(months))
+    ds = xr.Dataset({"sw": (("time", "lat", "lon"), np.stack(out).astype("f4")),
+                     "sw_count": (("time", "lat", "lon"), np.stack(cnt).astype("f4"))},
+                    coords={"time": np.array(months, dtype="datetime64[ns]"), "lat": g1.lat, "lon": g1.lon})
+    ds["sw"].attrs = {"long_name": "monthly mean ERA5-Land surface downward shortwave", "units": "W m-2"}
+    ds.attrs = {"source": f"{e['collection']} {e['sw_band']}", "resolution_deg": res,
+                "purpose": "CERES SYN1deg Ed4B discontinuity test (April 2022)"}
+    out_dir = REPO_ROOT / gcfg["out_dir"]
+    out_dir.mkdir(parents=True, exist_ok=True)
+    f = out_dir / f"shortwave_monthly_1deg_{start:%Y%m}_{end:%Y%m}.nc"
+    ds.to_netcdf(f)
+    log.info("wrote %s", f.relative_to(REPO_ROOT))
+
+
+def run_burned(cfg: dict, start: dt.date, end: dt.date) -> None:
+    """Fraction of each cell burned between start and end (MCD64A1 BurnDate > 0)."""
+    gcfg = cfg["gee"]
+    fine = grid_from_config(cfg, gcfg["fetch_grid"])
+    col = ee.ImageCollection(gcfg["burned"]["collection"]).filterDate(str(start), str(end + dt.timedelta(days=1)))
+    native = col.first().projection()  # composites lose the default projection
+    burned = col.select("BurnDate").max().gt(0).unmask(0).rename("burned").setDefaultProjection(native)
+    a = fetch(_to_grid(burned, fine, int(gcfg["max_pixels"])), fine)["burned_mean"]
+    a = np.nan_to_num(a, nan=0.0)
+    out_dir = REPO_ROOT / gcfg["out_dir"]
+    for gname in cfg["grids"]:
+        grid = grid_from_config(cfg, gname)
+        factor = int(round(grid.res / fine.res))
+        f = a if factor == 1 else a.reshape(grid.ny, factor, grid.nx, factor).mean(axis=(1, 3))
+        ds = xr.Dataset({"burned_fraction": (("lat", "lon"), f.astype("f4"))},
+                        coords={"lat": grid.lat, "lon": grid.lon})
+        ds.attrs = {"source": gcfg["burned"]["collection"], "start": str(start), "end": str(end),
+                    "purpose": "exclude burned cells from generic QC points"}
+        out = out_dir / f"burned_{gname}_{start:%Y%m%d}_{end:%Y%m%d}.nc"
+        ds.to_netcdf(out)
+        log.info("wrote %s", out.relative_to(REPO_ROOT))
+
+
 def main(argv=None) -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("product", choices=["fpar", "nbar", "landcover", "mask"])
+    p.add_argument("product", choices=["fpar", "nbar", "landcover", "mask", "shortwave", "shortwave_monthly_1deg",
+                                       "burned"])
     p.add_argument("--start", type=dt.date.fromisoformat)
     p.add_argument("--end", type=dt.date.fromisoformat)
     p.add_argument("--year", type=int)
@@ -250,6 +345,12 @@ def main(argv=None) -> None:
         run_timeseries(args.product, cfg, args.start, args.end)
     elif args.product == "landcover":
         run_landcover(cfg, args.year)
+    elif args.product == "shortwave":
+        run_shortwave(cfg, args.start, args.end)
+    elif args.product == "shortwave_monthly_1deg":
+        run_shortwave_monthly_1deg(cfg, args.start, args.end)
+    elif args.product == "burned":
+        run_burned(cfg, args.start, args.end)
     else:
         run_mask(cfg)
 

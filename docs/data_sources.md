@@ -130,9 +130,39 @@ Fuentes: páginas oficiales de FIRMS (`/api/`, `/api/map_key/`, `/api/area/`, `/
 | FIRMS MAP_KEY | API por área (opcional) | Solo si se usa la API |
 | S5P-PAL | TROPOSIF | No parece necesaria |
 
+## Actualización del 6 de noviembre de 2026 (tarea 4)
+
+- **Google Earth Engine** ✅: proyecto `ee-magifranquesa`.
+  - El cliente por defecto de `earthengine authenticate` (y el de gcloud) los bloquea Google.
+  - Se usan credenciales de gcloud (application-default) con un cliente OAuth propio de escritorio; los pasos están en el README.
+  - `ee.Initialize` necesita que se le pasen esas credenciales de forma explícita (`physiofire.download.gee.initialize`).
+- **MCD43C4 no está en el catálogo de GEE** ✅. Se usa `MODIS/061/MCD43A4` (NBAR de 500 m, diario, de 2000 al 28 de octubre de 2026), agregado en GEE a 0,05°.
+  - Agregación: media ponderada por área de los píxeles válidos.
+  - Calidad: `BRDF_Albedo_Band_Mandatory_Quality_BandN` ≤ 1 (0 = inversión completa, 1 = inversión de magnitud).
+  - Es equivalente a MCD43C4, que también se obtiene agregando MCD43A4.
+- **MCD15A3H en GEE** ✅: `MODIS/061/MCD15A3H`, con las bandas `Fpar`, `Lai`, `FparLai_QC`, `FparExtra_QC`, `FparStdDev` y `LaiStdDev`.
+  - Filtro: SCF_QC (bits 5–7 de `FparLai_QC`) ≤ 1, es decir, solo el algoritmo principal. Los bits están **(verificar)** con la guía de usuario de MOD15.
+- **MCD12C1 en GEE** ✅: `MODIS/061/MCD12C1`, de 2001 a 2025, con el porcentaje de cada clase IGBP (`Land_Cover_Type_1_Percent_Class_0..16`) en la rejilla nativa de 0,05°.
+  - ⚠️ **Pendiente:** contrastarlo con CORINE o ESA WorldCover (`ESA/WorldCover/v200` está en GEE), porque las clases IGBP pueden confundir matorral y arbolado mediterráneos (sabanas leñosas, matorral abierto).
+- **ERA5-Land en GEE** ✅:
+  - `ECMWF/ERA5_LAND/DAILY_AGGR` (de 1950 al 26 de octubre de 2026) trae todo lo que necesita la AED con FAO-56: `temperature_2m_min`/`_max`, `dewpoint_temperature_2m`, viento a 10 m, `surface_solar_radiation_downwards_sum`, `surface_net_solar_radiation_sum`, `surface_net_thermal_radiation_sum` y `surface_pressure`. Trae también `snow_cover` y `snow_depth_water_equivalent`.
+  - `ECMWF/ERA5_LAND/HOURLY` sirve para el FWI a mediodía.
+- **El ERA5 de GEE no tiene PAR** ✅: ninguna de las 292 bandas de `ECMWF/ERA5/HOURLY` es PAR.
+- **PAR provisional**: PAR = 0,48 × radiación solar descendente diaria de ERA5-Land (media diaria en W/m²), interpolada bilinealmente desde 0,1°.
+  - El valor 0,48 está dentro del rango habitual de la fracción energética PAR/global (0,45–0,50); falta citar la referencia.
+  - Al ser un factor constante, reescala SIF/APAR de forma uniforme: no cambia la forma ni el momento de sus anomalías, pero los valores absolutos no son comparables con los de Tang.
+  - Queda marcado como provisional en `config.yaml` (`par.provisional: true`) y en los atributos de los archivos de salida.
+- **CERES Ed4B, volúmenes** ✅ (CMR): el diario de mayo de 2018 a agosto de 2026 son 2770 gránulos, 280 GB; el mensual, 91 gránulos, 9,6 GB (~105 MB cada uno).
+  - La prueba del salto de abril de 2022 se hace con el **mensual**, frente a la radiación solar descendente mensual de ERA5-Land en la rejilla de 1° de CERES.
+  - La descarga necesita Earthdata (los enlaces apuntan a `data.asdc.earthdata.nasa.gov/asdc-prod-protected/`).
+- **MCD64A1 en GEE** ✅: de 2000 a agosto de 2026. Solo se usa para mantener los puntos genéricos de control lejos de celdas quemadas.
+
 ## Diferencias con Tang et al. (2026) que hay que documentar
 
 - CERES Ed4B (Ed4.2) en lugar de Ed4.1/Ed4A, con el cambio de entradas de abril de 2022.
 - TROPOSIF L2B (qa > 0,5) en lugar de qa ≥ 0,5, si no se usa el L2.
 - VPD y meteorología de ERA5-Land en lugar de AIRS.
 - Nieve de ERA5-Land en lugar de GlobSnow (decisión pendiente).
+- NBAR de MCD43A4 agregado en GEE en lugar de MCD43C4; LAI y fPAR agregados en GEE, como en el artículo.
+- AED en lugar de VPD como variable atmosférica.
+- PAR provisional a partir de ERA5-Land hasta la prueba con CERES.

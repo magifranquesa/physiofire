@@ -4,6 +4,9 @@ data/*
 data/fires/*
 !data/fires/selected_fires.csv
 
+# Regenerable quick-look figures
+figures/qc/
+
 # Personal drafts
 docs/correo_Maes.md
 
