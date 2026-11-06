@@ -21,6 +21,15 @@ grids:
   fine:
     resolution_deg: 0.05  # finer TROPOMI gridding (to be verified)
 
+troposif:
+  stac_url: https://data-portal.s5p-pal.com/api/s5p-l2
+  collection: L2B_SIF___      # daily, ungridded, already filtered to qa_value > 0.5
+  subset_buffer_deg: 0.1      # keep pixels whose centre lies within region + buffer
+  out_dir: data/raw/troposif/l2b_iberia
+  tmp_dir: data/raw/troposif/_tmp
+  manifest: data/raw/troposif/manifest.csv
+  max_retries: 3
+
 # Parameters taken from Tang et al. (2026), Methods.
 sif:
   wavelength_nm: 743

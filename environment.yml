@@ -24,6 +24,7 @@ dependencies:
   - pyyaml
   - earthaccess
   - cdsapi
+  - earthengine-api   # MODIS (MCD43C4, MCD15A3H), land cover and ERA5-Land aggregated in GEE
   - pytest
   - ipykernel
 # R (fire table, superposed epoch analysis, figures) is NOT managed here:
