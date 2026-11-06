@@ -35,3 +35,11 @@ renv::restore()
 ## Credentials
 
 Not stored in the repository: NASA Earthdata (`~/_netrc` on Windows or `earthaccess.login()`), Copernicus CDS (`~/.cdsapirc`).
+
+Google Earth Engine (project in `config.yaml`): the default `earthengine authenticate` client is blocked by Google, so use gcloud application-default credentials with your own OAuth desktop client (Google Cloud console > Google Auth Platform > Clients; add yourself as test user):
+
+```
+gcloud.cmd auth application-default login --client-id-file=<client_secret.json> --scopes=https://www.googleapis.com/auth/earthengine,https://www.googleapis.com/auth/cloud-platform
+```
+
+`physiofire.download.gee.initialize()` passes these credentials to `ee.Initialize` explicitly.

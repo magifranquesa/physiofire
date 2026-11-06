@@ -30,6 +30,25 @@ troposif:
   manifest: data/raw/troposif/manifest.csv
   max_retries: 3
 
+gee:
+  project: ee-magifranquesa   # authentication: gcloud application-default credentials (see README)
+  out_dir: data/interim/gee
+  fetch_grid: fine            # GEE aggregates 500 m data to this grid; coarser grids are built locally
+  max_pixels: 65535           # reduceResolution input pixels per output cell
+  fpar:
+    collection: MODIS/061/MCD15A3H
+    scf_qc_max: 1             # FparLai_QC bits 5-7 (SCF_QC): 0/1 = main algorithm (to verify with MOD15 user guide)
+    composite_center_days: 1.5  # 4-day composite: time_start + 1.5 d = centre
+  nbar:
+    collection: MODIS/061/MCD43A4   # MCD43C4 is not in the GEE catalogue; MCD43A4 (500 m) aggregated instead
+    bands: {red: Nadir_Reflectance_Band1, nir: Nadir_Reflectance_Band2, blue: Nadir_Reflectance_Band3}
+    max_mandatory_quality: 1  # 0 full BRDF inversion, 1 magnitude inversion
+  landcover:
+    collection: MODIS/061/MCD12C1
+  boundaries:
+    collection: USDOS/LSIB_SIMPLE/2017
+    countries: [Spain, Portugal]   # mainland polygon of each kept (Balearics, Canaries, Azores, Madeira out)
+
 # Parameters taken from Tang et al. (2026), Methods.
 sif:
   wavelength_nm: 743
