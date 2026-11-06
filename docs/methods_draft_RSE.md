@@ -185,7 +185,10 @@ A constant $f$ rescales SIF/APAR uniformly and does not alter the timing or rela
 
 **[Planned] Outlier screening without removing extreme stress.** A filter at the 1st and 99th percentiles computed over all cells and days can preferentially remove the extreme low values of a record-breaking season such as 2025, which is precisely the signal of interest. The pooled filter is therefore replaced by a two-step screening:
 1. **Input validity:** SIF/APAR is not computed where the denominator is unreliable: $f_\mathrm{PAR} < f_\mathrm{min}$, PAR $< \mathrm{PAR}_\mathrm{min}$, or fewer than $n_\mathrm{min}$ equivalent TROPOMI pixels **[TODO: thresholds]**.
-2. **Per-cell robust filter:** only isolated spikes are removed, using values further than $k$ median absolute deviations from the cell's median for the same season **[TODO: $k$, e.g. 6; season definition]**. Post-burn data are excluded when computing these statistics.
+2. **Per-cell isolated-spike filter [Implemented, tested on synthetic data]** (Hampel type). For each cell, the residual of each value to the running median of the cell's own series over ±3 days is computed. Values whose residual exceeds $k$ times the cell's robust noise scale ($1.4826 \times$ the median absolute residual over its record) are removed, with $k = 6$ **[TODO: confirm]**. A persistent anomaly also shifts the running median, so it is retained; this differs from a filter relative to the climatology, which would remove deep but real stress.
+   - **Temporal support:** the running median is centred, so it uses up to three days *after* the evaluated day.
+   - **No fire leakage:** it is applied after masking from the cut-off date, so near ignition the window only contains pre-fire data. The filter only deletes values, it never shifts them.
+   - **Not operational:** it is therefore valid for the retrospective epoch analysis, but not for an operational system, which will need a backward-only version **[backlog]**.
 
 Ratio values are not clipped at a lower percentile, because negative SIF retrievals are unbiased noise and clipping them only on one side would bias the mean. The pooled 1–99 filter of Tang et al. (2026) is kept as a sensitivity test.
 

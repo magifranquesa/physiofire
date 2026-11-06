@@ -32,6 +32,12 @@ Cada entrada indica qué se prueba, contra qué referencia y dónde está descri
 | 17 | Cobertura del suelo del año anterior a cada incendio | mapa fijo de 2017 | 2.12 |
 | 18 | FWI propio con ERA5-Land a mediodía a 0,05° | FWI de CEMS a 0,25° | 2.9 |
 
+## Versión operativa (después de la prueba de concepto)
+
+| # | Tarea | Motivo | Borrador |
+| --- | --- | --- | --- |
+| 19 | Filtro de picos solo hacia atrás (mediana de los días anteriores) en lugar del centrado de ±3 días | El filtro centrado usa hasta 3 días posteriores al evaluado: vale en el análisis retrospectivo (siempre antes del corte), pero no en tiempo real | 2.7 |
+
 ## Hechas
 
 | Fecha | Prueba | Resultado | Commit |
