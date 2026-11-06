@@ -147,10 +147,16 @@ def build(cfg: dict, start: dt.date, end: dt.date) -> None:
         sw = _open(gee_dir / f"shortwave_{gname}_{tag}.nc").sw.sel(time=days)
         par = (float(pcfg["par_fraction"]) * sw).where(sw > 0)
 
-        # fPAR composites -> daily
+        # fPAR composites -> daily (descriptive, centred interpolation). MAIN: MCD15A3H; SENSITIVITY: VNP15A2H.
         fp = _open(next(p for p in sorted(gee_dir.glob(f"fpar_{gname}_*.nc"))))
         fpar_d = composites_to_daily(fp.fpar.where(fp.fpar_count > 0), fp.time_center.values, days,
                                      float(acfg["fpar_max_gap_days"]))
+        fpv_files = sorted(gee_dir.glob(f"fpar_viirs_{gname}_*.nc"))
+        fpar_v = None
+        if fpv_files:
+            fv = _open(fpv_files[-1])
+            fpar_v = composites_to_daily(fv.fpar.where(fv.fpar_count > 0), fv.time_center.values, days,
+                                         float(acfg["fpar_viirs_max_gap_days"]))
 
         idx = {}
         for name, x in [("ndvi", ndvi_f), ("evi", evi_f), ("nirv", nirv_f)]:
@@ -178,6 +184,14 @@ def build(cfg: dict, start: dt.date, end: dt.date) -> None:
             "nirv": nv,
             "land_fraction": _open(gee_dir / f"mask_peninsula_{gname}.nc").land_fraction,
         })
+        if fpar_v is not None:
+            fvv = fpar_v.assign_coords(coords).where(mask)
+            ds["fpar_viirs"] = fvv
+            ds["sif_apar_viirs"] = sif_apar(s, p, fvv)
+            ds["fpar_viirs"].attrs = {"units": "1", "long_name": "daily fPAR from VNP15A2H 8-day composites "
+                                      "(SENSITIVITY; descriptive centred interpolation)"}
+            ds["sif_apar_viirs"].attrs = {"units": "mW m-2 sr-1 nm-1 / (W m-2)",
+                                          "long_name": "SIF / (PAR x fPAR_VIIRS), unfiltered (SENSITIVITY)"}
         units = {"sif": "mW m-2 sr-1 nm-1", "sif_sem": "mW m-2 sr-1 nm-1", "par": "W m-2", "apar": "W m-2",
                  "fpar": "1", "sif_apar": "mW m-2 sr-1 nm-1 / (W m-2)", "sif_par": "mW m-2 sr-1 nm-1 / (W m-2)",
                  "sif_apar_nirv": "mW m-2 sr-1 nm-1 / (W m-2)", "sif_nirv": "mW m-2 sr-1 nm-1",

@@ -36,9 +36,28 @@ gee:
   fetch_grid: fine            # GEE aggregates 500 m data to this grid; coarser grids are built locally
   max_pixels: 65535           # reduceResolution input pixels per output cell
   fpar:
-    collection: MODIS/061/MCD15A3H
-    scf_qc_max: 1             # FparLai_QC bits 5-7 (SCF_QC): 0/1 = main algorithm (to verify with MOD15 user guide)
+    collection: MODIS/061/MCD15A3H   # MAIN fPAR source (4-day, as in Tang et al.)
+    scf_bit_start: 5          # FparLai_QC bits 5-7 = SCF_QC (to verify with MOD15 user guide)
+    scf_qc_max: 1             # 0/1 = main (RT) algorithm
+    scale: 0.01               # GEE asset stores integers 0-100 (+ fill 249-255): scale applied here
+    valid_max_raw: 100        # valid range in asset units (before scaling)
+    composite_days: 4
     composite_center_days: 1.5  # 4-day composite: time_start + 1.5 d = centre
+  fpar_viirs:
+    collection: NASA/VIIRS/002/VNP15A2H   # SENSITIVITY fPAR source (8-day, S-NPP, collection 2)
+    scf_bit_start: 0          # VIIRS: SCF_QC is bits 0-2 (VNP15 User Guide v1.1, Table 4), NOT 5-7 as in MODIS
+    scf_qc_max: 1             # 0/1 = main (RT) algorithm
+    scale: 1.0                # ASSET IS PRE-SCALED by GEE (double 0-2.55; fill 249-255 -> 2.49-2.55): no factor
+    valid_max_raw: 1.0        # valid range in asset units: Fpar <= 1.0 excludes fill values
+    composite_days: 8
+    composite_center_days: 3.5  # 8-day composite: time_start + 3.5 d = centre
+  # Plausible range of the MEDIAN of each fetched image (valid cells). Catches scaling errors only;
+  # the fetch stops with an error naming product and date if a median falls outside.
+  plausible_median:
+    fpar: [0.05, 0.95]
+    red: [0.01, 0.40]
+    nir: [0.05, 0.60]
+    blue: [0.005, 0.30]
   nbar:
     collection: MODIS/061/MCD43A4   # MCD43C4 is not in the GEE catalogue; MCD43A4 (500 m) aggregated instead
     bands: {red: Nadir_Reflectance_Band1, nir: Nadir_Reflectance_Band2, blue: Nadir_Reflectance_Band3}
@@ -91,7 +110,12 @@ sif_apar:
   min_land_fraction: 0.5         # cells used: at least this fraction inside mainland Spain + Portugal
   fpar_max_gap_days: 12          # max gap filled when interpolating 4-day fPAR composites to daily
   fpar_composite_days: 4         # MCD15A3H compositing period (start .. start+3)
-  fpar_persist_days: 5           # epoch analysis: carry last valid composite forward at most this many days
+  fpar_persist_days: 5           # epoch analysis (MCD15A3H): carry last valid composite forward at most this many days
+  fpar_viirs_max_gap_days: 16    # VNP15A2H 8-day composites: bridge one missing composite
+  fpar_viirs_persist_days: 11    # epoch analysis (VNP15A2H): covers day -1 in the worst case (centre 10.5 d before)
+  # Persistence biases SIF/APAR LOW if structure declines before ignition (stale, too-high fPAR): same direction
+  # as the signal sought. The NO-PERSISTENCE run is the reference for validating any lead time.
+  fpar_persist_sensitivity: {modis: [null], viirs: [8, null]}
   screening:                     # applied in the anomaly stage, after post-fire masking [TODO thresholds]
     fpar_min: null
     par_min: null

@@ -5,7 +5,10 @@ valid pixels and their count; coarser grids (0.25 deg) are built locally by coun
 averaging (`block_mean`), so both scales are consistent.
 
 Products:
-    fpar        MCD15A3H Fpar, main-algorithm retrievals only (4-day composites)
+    fpar        MCD15A3H Fpar, main-algorithm retrievals only (4-day composites); MAIN fPAR
+    fpar_viirs  VNP15A2H (S-NPP, collection 2) Fpar, main algorithm (8-day composites); SENSITIVITY fPAR.
+                NOTE: SCF_QC bits and asset scaling differ from MCD15A3H (see config).
+    check       re-check an existing file against the plausible median ranges
     nbar        MCD43A4 red/NIR/blue NBAR, mandatory quality <= max (daily); NDVI/EVI computed later
     landcover   MCD12C1 IGBP (Type 1) class percentages, majority class (yearly, native 0.05 deg)
     mask        fraction of each cell inside mainland Spain + Portugal (LSIB boundaries)
@@ -95,17 +98,42 @@ def block_mean(mean: np.ndarray, count: np.ndarray, factor: int) -> tuple[np.nda
 
 # --------------------------------------------------------------------------- products
 
-def fpar_images(gcfg: dict, start: dt.date, end: dt.date) -> ee.ImageCollection:
-    f = gcfg["fpar"]
+def fpar_images(gcfg: dict, start: dt.date, end: dt.date, product: str = "fpar") -> ee.ImageCollection:
+    """fPAR, main-algorithm retrievals only. Bit position of SCF_QC and asset scaling differ between
+    MCD15A3H (bits 5-7, integer 0-100) and NASA/VIIRS/002/VNP15A2H (bits 0-2, pre-scaled 0-1): see config."""
+    f = gcfg[product]
 
     def prep(img):
-        qc = img.select("FparLai_QC")
-        scf = qc.rightShift(5).bitwiseAnd(7)
+        scf = img.select("FparLai_QC").rightShift(int(f["scf_bit_start"])).bitwiseAnd(7)
         fpar = img.select("Fpar")
-        ok = scf.lte(int(f["scf_qc_max"])).And(fpar.lte(100))
-        return fpar.multiply(0.01).updateMask(ok).rename("fpar").copyProperties(img, ["system:time_start"])
+        ok = scf.lte(int(f["scf_qc_max"])).And(fpar.lte(float(f["valid_max_raw"])))
+        return fpar.multiply(float(f["scale"])).updateMask(ok).rename("fpar").copyProperties(img, ["system:time_start"])
 
     return ee.ImageCollection(f["collection"]).filterDate(str(start), str(end + dt.timedelta(days=1))).map(prep)
+
+
+class ImplausibleValues(RuntimeError):
+    """Raised when the median of a fetched image is outside the plausible range (likely a scaling error)."""
+
+
+def check_plausible(product: str, date, means: dict[str, np.ndarray], counts: dict[str, np.ndarray],
+                    ranges: dict) -> dict[str, float]:
+    """Check the median over valid cells of every variable with a configured range. Returns the medians.
+    Raises ImplausibleValues naming product, date and variable if a median falls outside its range."""
+    medians = {}
+    for var, (lo, hi) in ranges.items():
+        if var not in means:
+            continue
+        ok = (counts[var] > 0) & np.isfinite(means[var])
+        if not ok.any():
+            log.warning("%s %s: no valid cells for %s, plausibility check skipped", product, date, var)
+            continue
+        med = float(np.median(means[var][ok]))
+        medians[var] = med
+        if not (lo <= med <= hi):
+            raise ImplausibleValues(f"{product} {date}: median {var} = {med:.4g} outside plausible range "
+                                    f"[{lo}, {hi}] (check asset scaling)")
+    return medians
 
 
 def nbar_images(gcfg: dict, start: dt.date, end: dt.date) -> ee.ImageCollection:
@@ -154,8 +182,8 @@ def _collection_dates(col: ee.ImageCollection) -> list[int]:
 def run_timeseries(product: str, cfg: dict, start: dt.date, end: dt.date) -> None:
     gcfg = cfg["gee"]
     fine = grid_from_config(cfg, gcfg["fetch_grid"])
-    if product == "fpar":
-        col = fpar_images(gcfg, start, end)
+    if product in ("fpar", "fpar_viirs"):
+        col = fpar_images(gcfg, start, end, product)
     elif product == "nbar":
         col = nbar_images(gcfg, start, end)
     else:
@@ -165,19 +193,26 @@ def run_timeseries(product: str, cfg: dict, start: dt.date, end: dt.date) -> Non
     log.info("%s: %d images", product, len(times))
 
     layers: dict[str, list] = {}
+    ranges = gcfg.get("plausible_median", {})
     for i, t in enumerate(times):
         img = _to_grid(ee.Image(imgs.get(i)), fine, int(gcfg["max_pixels"]))
         a = fetch(img, fine)
+        day = dt.datetime.utcfromtimestamp(t / 1000).date()
+        base = {k.rsplit("_", 1)[0] for k in a}
+        med = check_plausible(product, day, {v: a[f"{v}_mean"] for v in base}, {v: a[f"{v}_count"] for v in base},
+                              ranges)
         for k, v in a.items():
             layers.setdefault(k, []).append(v)
-        log.info("%s %s fetched (%d/%d)", product, dt.datetime.utcfromtimestamp(t / 1000).date(), i + 1, len(times))
+        log.info("%s %s fetched (%d/%d) medians %s", product, day, i + 1, len(times),
+                 {k: round(v, 3) for k, v in med.items()})
 
     time_coord = np.array(times, dtype="datetime64[ms]").astype("datetime64[ns]")
-    if product == "fpar":
-        center = time_coord + np.timedelta64(int(float(gcfg["fpar"]["composite_center_days"]) * 86400), "s")
+    extra = None
+    if product in ("fpar", "fpar_viirs"):
+        center = time_coord + np.timedelta64(int(float(gcfg[product]["composite_center_days"]) * 86400), "s")
+        extra = {"time_center": ("time", center)}
     base_vars = sorted({k.rsplit("_", 1)[0] for k in layers})
-    write_grids(product, cfg, base_vars, layers, time_coord, start, end,
-                extra_coords={"time_center": ("time", center)} if product == "fpar" else None)
+    write_grids(product, cfg, base_vars, layers, time_coord, start, end, extra_coords=extra)
 
 
 def write_grids(product, cfg, base_vars, layers, time_coord, start, end, extra_coords=None) -> None:
@@ -205,8 +240,14 @@ def write_grids(product, cfg, base_vars, layers, time_coord, start, end, extra_c
         ds = xr.Dataset(data, coords=coords)
         for v in base_vars:
             ds[f"{v}_count"].attrs["long_name"] = f"number of valid 500 m pixels (area-weighted) behind {v}"
-        ds.attrs = {"source": gcfg[product]["collection"], "aggregated_in": "Google Earth Engine",
+        pc = gcfg[product]
+        ds.attrs = {"source": pc["collection"], "gee_asset": pc["collection"], "aggregated_in": "Google Earth Engine",
+                    "retrieved_utc": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
                     "fetch_grid_deg": fine.res, "resolution_deg": grid.res, "Conventions": "CF-1.8"}
+        if "scale" in pc:
+            ds.attrs.update(scale_factor_applied=float(pc["scale"]), valid_max_asset_units=float(pc["valid_max_raw"]),
+                            asset_prescaled=int(float(pc["scale"]) == 1.0),
+                            scf_qc_bits=f"{pc['scf_bit_start']}-{int(pc['scf_bit_start']) + 2} <= {pc['scf_qc_max']}")
         out = out_dir / f"{product}_{gname}_{start:%Y%m%d}_{end:%Y%m%d}.nc"
         ds.to_netcdf(out, encoding={v: {"zlib": True, "complevel": 4} for v in ds.data_vars})
         log.info("wrote %s", out.relative_to(REPO_ROOT))
@@ -362,6 +403,18 @@ def run_burned(cfg: dict, start: dt.date, end: dt.date) -> None:
         log.info("wrote %s", out.relative_to(REPO_ROOT))
 
 
+def check_file(path: str, ranges: dict) -> None:
+    """Re-run the plausibility check on every time step of an existing fetch-grid file."""
+    ds = xr.open_dataset(path)
+    product = ds.attrs.get("source", path)
+    base = [v for v in ds.data_vars if f"{v}_count" in ds]
+    for t in ds.time.values:
+        s = ds.sel(time=t)
+        check_plausible(product, str(t)[:10], {v: s[v].values for v in base},
+                        {v: s[f"{v}_count"].values for v in base}, ranges)
+    log.info("%s: all %d time steps within plausible ranges", path, ds.sizes["time"])
+
+
 def run_burn_history(cfg: dict, y0: int, y1: int) -> None:
     """Yearly MCD64A1 burn history per cell: burned fraction and first burn date (day of year).
     Used for the climatology/control masks (burned fraction above a threshold) and for the
@@ -413,16 +466,20 @@ def run_burn_history(cfg: dict, y0: int, y1: int) -> None:
 
 def main(argv=None) -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("product", choices=["fpar", "nbar", "mod09ga", "myd09ga", "landcover", "mask", "shortwave",
-                                       "shortwave_monthly_1deg", "burned", "burn_history"])
+    p.add_argument("product", choices=["fpar", "fpar_viirs", "nbar", "mod09ga", "myd09ga", "landcover", "mask",
+                                       "shortwave", "shortwave_monthly_1deg", "burned", "burn_history", "check"])
+    p.add_argument("--file", help="for 'check': NetCDF written by this module to re-check against plausible ranges")
     p.add_argument("--start", type=dt.date.fromisoformat)
     p.add_argument("--end", type=dt.date.fromisoformat)
     p.add_argument("--year", type=int)
     args = p.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     cfg = load_config()
+    if args.product == "check":
+        check_file(args.file, cfg["gee"].get("plausible_median", {}))
+        return
     initialize(cfg["gee"]["project"])
-    if args.product in ("fpar", "nbar", "mod09ga", "myd09ga"):
+    if args.product in ("fpar", "fpar_viirs", "nbar", "mod09ga", "myd09ga"):
         run_timeseries(args.product, cfg, args.start, args.end)
     elif args.product == "burn_history":
         y0, y1 = cfg["gee"]["burn_history_years"]

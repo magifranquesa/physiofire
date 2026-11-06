@@ -157,6 +157,50 @@ Fuentes: páginas oficiales de FIRMS (`/api/`, `/api/map_key/`, `/api/area/`, `/
   - La descarga necesita Earthdata (los enlaces apuntan a `data.asdc.earthdata.nasa.gov/asdc-prod-protected/`).
 - **MCD64A1 en GEE** ✅: de 2000 a agosto de 2026. Solo se usa para mantener los puntos genéricos de control lejos de celdas quemadas.
 
+## fPAR de VIIRS (prueba de sensibilidad; verificado el 6 de noviembre de 2026)
+
+- **VNP15A2H (S-NPP) en GEE** ✅: el asset vigente es `NASA/VIIRS/002/VNP15A2H` (colección 2), de 500 m, con datos del 17 de enero de 2012 al 24 de octubre de 2026 (679 compuestos).
+  - El asset antiguo `NOAA/VIIRS/001/VNP15A2H` está **obsoleto**; GEE avisa de que lo sustituye `NASA/VIIRS/002/VNP15A2H`.
+  - Existe también una versión `_RAW` (sin procesar por GEE); se usa la normal.
+  - En CMR: `VNP15A2H` v002, "VIIRS/NPP Leaf Area Index/FPAR 8-Day L4 Global 500m SIN Grid V002" (LP DAAC).
+- **Bandas** ✅: `Fpar`, `Lai`, `FparLai_QC`, `FparExtra_QC`, `FparStdDev` y `LaiStdDev`; los mismos nombres que en MCD15A3H.
+  - `Fpar`: entero sin signo de 8 bits, rango válido 0–100, relleno 249–255, factor de escala 0,01 (guía de usuario, tabla 3).
+- **Compuestos de 8 días** ✅:
+  - En GEE, `system:time_end` = `system:time_start` + 8 días, así que cada compuesto cubre del inicio al inicio + 7.
+  - Calendario fijo por día del año (en el periodo de muestra empiezan el 2 y el 10 de junio, etc.).
+  - El producto compone retrievals diarios (PGE533) en 8 días (PGE534); guía de usuario, sección 3.3.
+- **Bits de calidad: distintos de MODIS** ✅ ([VNP15 User Guide v1.1](https://lpdaac.usgs.gov/documents/126/VNP15_User_Guide.pdf), tablas 4 y 5).
+  - **`FparLai_QC`:**
+    - **SCF_QC en los bits 0–2:** 0 = método principal (RT) sin saturación; 1 = RT con saturación ("good, very usable"); 2 = empírico por mala geometría; 3 = empírico por otras causas; 4 = sin dato.
+    - Bit 3: detector muerto.
+    - Bits 4–7: tipo de bioma.
+    - En **MCD15A3H**, SCF_QC está en los bits 5–7 (por verificar con la guía de MOD15). **No se puede reutilizar la máscara de MODIS tal cual.**
+  - **`FparExtra_QC`:** bits 0–1 nubes (0 despejado seguro, 1 probablemente despejado, 2 probablemente nuboso, 3 nuboso seguro), bit 2 sombra de nube, bit 3 cirro fino, bits 4–5 cantidad de aerosol, bit 6 nieve o hielo.
+  - ⚠️ La guía es la v1.1 (para la colección 1). No he encontrado una guía específica de la colección 2; el asset de GEE describe la misma disposición de bits.
+- **NOAA-20 (VJ115A2H)** ⚠️: **no está en GEE**. Existe en LP DAAC (CMR: `VJ115A2H` v002, "VIIRS/JPSS1 Leaf Area Index/FPAR 8-Day L4 Global 500m SIN Grid V002", desde el 1 de enero de 2018).
+  - Para usarlo habría que descargar las teselas con Earthdata (como MCD15A3H: 4 teselas por compuesto) y agregarlas aquí.
+- **NOAA-21 (VJ215A2H)** ✅ en GEE: `NASA/VIIRS/002/VJ215A2H`, desde el 10 de febrero de 2023. No cubre la climatología desde 2018.
+- **¿Aumenta la frecuencia si se combinan?** ❌ No.
+  - Los compuestos de S-NPP y NOAA-21 empiezan en las mismas fechas (calendario fijo de 8 días, comprobado en junio–septiembre de 2025); NOAA-20 sigue presumiblemente el mismo calendario.
+  - Combinarlos no da más de un compuesto cada 8 días. Solo mejora la cobertura y la calidad dentro de cada compuesto (más observaciones sin nubes): menos huecos, no más resolución temporal.
+- **Uso:** prueba de sensibilidad al sensor de fPAR y base para una futura versión operativa tras el fin de MODIS. MCD15A3H sigue siendo la fuente principal.
+- ⚠️ **Escala distinta entre los assets de GEE de MODIS y de VIIRS** (comprobado el 6 de noviembre de 2026, compuesto del 4 al 12 de julio de 2025):
+
+  | Asset | Tipo de `Fpar` | Valores | Relleno | Tratamiento |
+  | --- | --- | --- | --- | --- |
+  | `MODIS/061/MCD15A3H` | entero | 0–100 | 249–255 | × 0,01; válido ≤ 100 |
+  | `NASA/VIIRS/002/VNP15A2H` | real (double) | 0–1 (ya escalado) | 2,49–2,55 | **sin factor**; válido ≤ 1,0 |
+  | `NASA/VIIRS/002/VNP15A2H_RAW` | entero | 0–100 | 249–255 | como MODIS (no se usa) |
+
+  - Con el factor de la guía aplicado al asset ya escalado, el fPAR medio salía 0,004 en lugar de 0,36–0,40.
+  - Lo recogen `config.yaml` (`gee.fpar_viirs.scale: 1.0`) y los metadatos de los archivos (`asset_prescaled`, `scale_factor_applied`).
+  - **Comprobación automática:** `gee.py` detiene la descarga con un error que nombra el producto y la fecha si la mediana de un compuesto o día queda fuera de un rango plausible (`gee.plausible_median`: fPAR 0,05–0,95; rojo 0,01–0,40; NIR 0,05–0,60; azul 0,005–0,30). Se aplica a MCD15A3H, VNP15A2H, MCD43A4, MOD09GA y MYD09GA. `python -m physiofire.download.gee check --file ...` vuelve a comprobar archivos ya descargados.
+- **Comparación con MCD15A3H** (junio–septiembre de 2025, fPAR diario interpolado; `figures/qc/qc_fpar_viirs_vs_modis.csv`):
+  - **Toda la Península, a 0,25°:** sesgo mediano por celda de −0,010 (−2,4 %) y correlación mediana de 0,67. SIF/APAR con VIIRS es un 4 % mayor (mediana).
+  - **Matorral:** diferencias del −2 al −5 %. La correlación de las medias de 15 días de SIF/APAR es de 0,96 a 1,00.
+  - **Arbolado** (País Vasco y Girona): VIIRS es un 9–16 % más alto y SIF/APAR un 10–14 % más bajo. La forma de la serie se conserva (r de 0,90 a 0,98).
+  - **Caídas de MCD15A3H en arbolado:** el fPAR de MODIS tiene caídas de 0,2 a 0,5 entre compuestos consecutivos (probablemente nubes o sombras no marcadas), que crean picos artificiales de SIF/APAR. VIIRS, de 8 días, es mucho más estable. **[TODO]** Valorar el filtro de nubes de `FparExtra_QC` en MCD15A3H.
+
 ## Diferencias con Tang et al. (2026) que hay que documentar
 
 - CERES Ed4B (Ed4.2) en lugar de Ed4.1/Ed4A, con el cambio de entradas de abril de 2022.
