@@ -1,5 +1,7 @@
 # PHYSIOFIRE – Prueba de concepto
 
+> **IDIOMA: RESPONDE SIEMPRE EN CASTELLANO.** Vale para todo lo que lee el investigador: respuestas finales, mensajes intermedios entre herramientas, preguntas, opciones, resúmenes y planes. También después de leer documentación, salidas de herramientas o informes de subagentes en inglés: antes de escribir, vuelve al castellano. Solo el código, los nombres de variables, los comentarios en el código y los mensajes de commit van en inglés.
+
 Este archivo da contexto a Claude Code sobre el proyecto. Léelo entero antes de proponer o escribir código. La sección "Objetivo de la prueba de concepto" manda sobre todo lo demás.
 
 ## Cómo trabajar conmigo
