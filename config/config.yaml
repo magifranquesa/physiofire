@@ -33,8 +33,13 @@ troposif:
 # Parameters taken from Tang et al. (2026), Methods.
 sif:
   wavelength_nm: 743
-  min_quality: 0.5
+  variable: SIF_Corr_743     # day-length corrected SIF (as in Tang et al.)
+  error_variable: SIF_ERROR_743
+  min_quality: 0.5           # L2B already keeps only qa_value > 0.5 (see docs/data_sources.md)
   max_cloud_fraction: 0.5
+  exclude_lc_classes: [15, 16]   # LC_MASK (MCD12C1 2018): 15 snow/ice, 16 barren
+  footprint_subsamples: 4        # k x k sub-points per TROPOMI pixel for footprint-weighted gridding
+  grid_dir: data/interim/troposif_grid
 sif_apar:
   clip_percentiles: [1, 99]
 anomalies:
@@ -46,8 +51,12 @@ anomalies:
 epoch:
   window_days: 60          # days before fire start date
 
+sample_period:            # task 4: end-to-end SIF/APAR chain test (60-day window before mid-August fires + margin)
+  start: "2025-06-01"
+  end: "2025-09-07"
+
 fires:
-  first_case_year: 2022
+  first_case_year: 2025
   candidate_years: [2018, 2019, 2020, 2021, 2022, 2023, 2024]
 
 # Selection criteria: to be fixed (and documented in docs/fire_selection_criteria.md)

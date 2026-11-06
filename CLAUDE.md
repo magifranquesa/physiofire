@@ -10,14 +10,14 @@ Este archivo da contexto a Claude Code sobre el proyecto. Léelo entero antes de
 - Prioriza pasos pequeños y comprobables: descarga una muestra, inspecciona las variables y luego escala.
 - Antes de descargas grandes, estima el volumen y pregúntame.
 - Infraestructura mínima: construye solo lo que necesita el análisis de la prueba de concepto.
-- Entorno: Windows. Miniconda en `C:\ProgramData\miniconda3` (fuera del PATH; llamarlo por ruta completa). Usar conda-forge. Entorno conda `physiofire` solo para Python. R (versión actual de CRAN, binarios de CRAN) con renv y `renv.lock`; no meter R en conda (r-terra no se mantiene en conda-forge para Windows).
-- Lenguajes: el investigador trabaja habitualmente en R. Figuras y todo el código para publicar (tabla de incendios, época superpuesta, estadística) en R, salvo que otro lenguaje sea mejor o imprescindible. Python para descarga y procesado de rejillas (earthaccess, cdsapi, xarray, rejillado de TROPOMI). Intercambio en NetCDF (CF) y CSV.
+- Entorno: Windows. Miniconda en `C:\ProgramData\miniconda3` (fuera del PATH; llamarlo por ruta completa). Usar conda-forge. Entorno conda `physiofire` solo para Python. R (4.6.1 de CRAN, en `C:\Users\08856958A\AppData\Local\Programs\R\R-4.6.1`) con renv y `renv.lock`; no meter R en conda (r-terra no se mantiene en conda-forge para Windows).
+- Lenguajes: el investigador trabaja habitualmente en R. Figuras y todo el código para publicar (tabla de incendios, época superpuesta, estadística) en R, salvo que otro lenguaje sea mejor o imprescindible. Python para descarga y procesado de rejillas (earthaccess, cdsapi, earthengine-api, xarray, rejillado de TROPOMI). Intercambio en NetCDF (CF) y CSV.
 
 ## Objetivo científico
 
 Evaluar si el estado fisiológico de la vegetación observado desde satélite permite anticipar el peligro de incendio mejor y antes que los índices meteorológicos (FWI) y los índices de vegetación ópticos (NDVI, EVI).
 
-**Hipótesis:** la anomalía de SIF/APAR (rendimiento aparente de fluorescencia) anticipa el secado del combustible vivo y aporta información sobre el peligro de incendio que no está ya contenida en el FWI y el VPD, con antelación de días a 1–2 semanas, sobre todo en matorral y arbolado.
+**Hipótesis:** la anomalía de SIF/APAR (rendimiento aparente de fluorescencia) anticipa el secado del combustible vivo y aporta información sobre el peligro de incendio que no está ya contenida en el FWI y la demanda evaporativa atmosférica (AED), con antelación de días a 1–2 semanas, sobre todo en matorral y arbolado.
 
 **Motivación:** el FWI usa solo meteorología y no observa la vegetación viva. Los productos de humedad del combustible vivo (LFMC) y los índices ópticos detectan el estrés tarde.
 
@@ -31,7 +31,7 @@ Responder a una pregunta para decidir si seguir:
 
 **Análisis mínimo (época superpuesta):**
 - Muestra de incendios de la Península Ibérica (España y Portugal) seleccionados manualmente con criterios fijados de antemano (ver "Incendios").
-- Para cada incendio, anomalías de SIF/APAR, NDVI/EVI, FWI y VPD en los 60 días previos a la fecha de inicio.
+- Para cada incendio, anomalías de SIF/APAR, NDVI/EVI, FWI y AED en los 60 días previos a la fecha de inicio.
 - Controles sin incendio emparejados por vegetación, región y fecha.
 
 **Resultados:**
@@ -47,13 +47,14 @@ Responder a una pregunta para decidir si seguir:
 
 | Hito | Contenido | Fecha |
 | --- | --- | --- |
-| Caso 2022 | Mapas y compuestos de los incendios seleccionados de 2022 | mediados de enero de 2027 |
+| Caso 2025 | Mapas y compuestos de los incendios seleccionados de 2025 | mediados de enero de 2027 |
 | Prueba completa | Todos los incendios seleccionados y decisión de seguir o replantear | marzo de 2027 |
 | Artículo | Envío como autor de correspondencia | mayo–junio de 2027 |
 
 ## Incendios
 
-- **España:** cartografía anual de incendios de Ochoa et al. El investigador es colaborador y los datos están disponibles en el grupo.
+- **España:** cartografía anual de incendios de Ochoa et al. El investigador es colaborador y los datos están disponibles en el grupo. Confirmar que incluye 2025.
+- **Alternativa y complemento: perímetros de EFFIS.** Para grandes incendios son muy precisos, cubren España y Portugal con el mismo método e incluyen fecha. Si la cartografía de Ochoa no llega a 2025, usar EFFIS. Aunque llegue, EFFIS sirve para contrastar perímetros y fechas. Ojo: la fecha de EFFIS puede ser la de detección y los perímetros de incendios cercanos pueden aparecer fusionados; contrastar con FIRMS.
 - **Portugal:** cartografía de incendios disponible (fuente concreta a confirmar con el investigador).
 - **Fecha de inicio:** imprescindible para el análisis. Si una cartografía no la incluye, asignarla cruzando cada perímetro con la primera detección de FIRMS VIIRS y, si es posible, con la EGIF (España) o el ICNF (Portugal) **(verificar)**.
 - **Selección manual.** La cartografía tiene incertidumbre, así que se seleccionan incendios a mano, pero con criterios escritos **antes** de mirar SIF/APAR:
@@ -63,13 +64,15 @@ Responder a una pregunta para decidir si seguir:
   - sin solape con otros incendios en la ventana de 60 días.
 - **Muestra equilibrada:** matorral, arbolado y pasto; España y Portugal; varias regiones y años.
 - **Registro:** una tabla de incendios versionada (por ejemplo `data/fires/selected_fires.csv`) con identificador, país, fecha, superficie, vegetación, fuentes de la fecha y criterios que cumple. Irá como material suplementario.
-- **Periodo:** TROPOMI empieza en mayo de 2018. Los incendios de 2018 solo valen si la ventana de 60 días queda dentro del periodo con datos (por ejemplo, Monchique en agosto de 2018). Incluir también 2022 y 2024 (grandes incendios en ambos países).
+- **Periodo:** TROPOMI empieza en mayo de 2018. Los incendios de 2018 solo valen si la ventana de 60 días queda dentro del periodo con datos (por ejemplo, Monchique en agosto de 2018). Incluir también 2022, 2024 y, sobre todo, 2025 (caso inicial: grandes incendios de agosto de 2025 en el noroeste de España y en Portugal, con ola de calor).
+- **2026:** ensayo casi operativo, solo si hay perímetros provisionales y datos (CERES termina el 31 de agosto de 2026; usar PAR de ERA5 a partir de ahí).
 
 ## Meteorología y FWI
 
 - **Análisis principal:** fuente homogénea para toda la Península, para que las diferencias entre países no se confundan con efectos reales. Opciones: ERA5-Land, o AEMET (España) + IPMA (Portugal) si son comparables. Decisión pendiente con el investigador.
 - **Robustez:** datos de AEMET disponibles en el grupo (que trabaja con AEMET) para repetir el análisis en España con meteorología de mayor calidad.
-- **VPD:** calcularlo a partir de temperatura y humedad (o punto de rocío).
+- **AED (demanda evaporativa atmosférica):** variable atmosférica del análisis, en lugar del VPD. Integra temperatura, humedad, viento y radiación. Estimarla como evapotranspiración de referencia (ET0) con FAO-56 Penman-Monteith a partir de la fuente meteorológica elegida. Preguntar antes al investigador: su grupo (IPE, con AEMET) puede tener ya la AED calculada, y su método prevalece.
+- Nota: Tang et al. usan VPD, así que la comparación con su artículo no es directa; documentarlo en la discusión.
 - **FWI propio:** calcularlo con el sistema canadiense. Verificar que los datos tienen valores a mediodía de temperatura, humedad relativa y viento, y precipitación de 24 h.
 - **FWI de referencia:** el de EFFIS / Copernicus EMS, porque es la referencia operativa que el índice tendría que mejorar. Nombre exacto del dataset **(verificar)**.
 
@@ -104,15 +107,16 @@ Pasos del método que se usan en la prueba de concepto:
 
 | Variable | Fuente | Notas |
 | --- | --- | --- |
-| Incendios (España) | Cartografía anual de Ochoa et al. (datos del grupo) | Fecha de inicio a confirmar |
+| Incendios (España) | Cartografía anual de Ochoa et al. (datos del grupo) | Confirmar que incluye 2025 y la fecha de inicio |
+| Incendios (España y Portugal) | Perímetros de EFFIS | Alternativa si Ochoa no llega a 2025; contraste de perímetros y fechas |
 | Incendios (Portugal) | Cartografía a confirmar con el investigador | Fecha de inicio a confirmar |
 | Fecha de inicio | NASA FIRMS (VIIRS); EGIF (MITECO); ICNF | Acceso a EGIF e ICNF **(verificar)** |
-| SIF | TROPOSIF (TROPOMI): https://data-portal.s5p-pal.com/products/troposif.html | Producto rejillado o L2 por órbita, cobertura y latencia **(verificar)** |
-| PAR | CERES SYN1deg Ed4.1: https://ceres-tool.larc.nasa.gov/ord-tool/jsp/SYN1degEd41Selection.jsp | Diario, 1°; fecha final disponible **(verificar)** |
+| SIF | TROPOSIF (TROPOMI): https://data-portal.s5p-pal.com/products/troposif.html | L2B diario global (~400 MB/día, sin cuenta), hasta noviembre de 2026; descargar, recortar y borrar con script reanudable. Detalles en docs/data_sources.md |
+| PAR | CERES SYN1deg Ed4B ("Ed4.2" en la herramienta de pedidos; Ed4.1 ya no se ofrece) o PAR en superficie de ERA5 | CERES llega al 31 de agosto de 2026 y cambia de entradas en abril de 2022: comparar con ERA5 y comprobar el salto. Detalles en docs/data_sources.md |
 | fPAR | MODIS MCD15A3H v061 (LP DAAC) | Fin de MODIS; VIIRS VNP15A2H como alternativa **(verificar)** |
 | NDVI, EVI | MODIS MCD43C4 v061 (diario, 0,05°) | Fórmula de EVI en el artículo |
 | Meteorología | ERA5-Land, AEMET (grupo), IPMA | Ver "Meteorología y FWI" |
-| FWI de referencia | EFFIS / Copernicus EMS en el CDS | **(verificar)** |
+| FWI de referencia | EFFIS / Copernicus EMS en el EWDS (no en el CDS) | 0,25°, calculado con ERA5 a las 12 hora local; versión y acceso con la cuenta del CDS **(verificar)** |
 | Cobertura del suelo | CORINE o ESA WorldCover; MODIS MCD12C1 como en el artículo | Para estratificar y emparejar controles |
 
 Cuentas necesarias (probablemente): NASA Earthdata, Copernicus CDS y quizá el portal S5P-PAL.
@@ -120,10 +124,10 @@ Cuentas necesarias (probablemente): NASA Earthdata, Copernicus CDS y quizá el p
 ## Plan de trabajo
 
 1. **Entorno y repositorio** (mínimo).
-2. **Tabla de incendios:** cargar las cartografías, fijar los criterios de selección por escrito, asignar fechas y construir `selected_fires.csv`. Empezar por 2022.
+2. **Tabla de incendios:** cargar las cartografías, fijar los criterios de selección por escrito, asignar fechas y construir `selected_fires.csv`. Empezar por 2025.
 3. **Verificar fuentes de satélite y meteorología:** TROPOSIF, CERES, MCD15A3H, MCD43C4, FWI de EFFIS y la fuente meteorológica elegida.
-4. **Cadena de SIF/APAR de punta a punta** con un mes de muestra (julio de 2022).
-5. **Caso 2022:** anomalías de todas las variables para los incendios de 2022 y sus controles; primeras figuras de época superpuesta.
+4. **Cadena de SIF/APAR de punta a punta** con un periodo de muestra (julio–agosto de 2025).
+5. **Caso 2025:** anomalías de todas las variables para los incendios de 2025 y sus controles; primeras figuras de época superpuesta. Requiere la serie completa de TROPOSIF para la climatología.
 6. **Prueba completa:** todos los incendios seleccionados, controles, estratificación, las dos escalas y decisión.
 
 Después, solo si la decisión es seguir: réplica de Tang, LFMC, modelo predictivo y validación cruzada por bloques.
@@ -131,7 +135,7 @@ Después, solo si la decisión es seguir: réplica de Tang, LFMC, modelo predict
 ## Reglas metodológicas
 
 - **Criterios antes que resultados:** la selección de incendios y controles se fija y se registra antes de analizar SIF/APAR.
-- **Comparar siempre con referencias:** FWI, VPD y NDVI/EVI. El resultado interesante es lo que SIF/APAR aporta más allá de ellos.
+- **Comparar siempre con referencias:** FWI, AED y NDVI/EVI. El resultado interesante es lo que SIF/APAR aporta más allá de ellos.
 - **Peligro frente a ignición:** la ocurrencia de incendios refleja también igniciones humanas. Al trabajar con incendios seleccionados y controles emparejados, documentar este sesgo.
 - **Sin fuga de información** (para la fase predictiva): cada predicción usa solo datos disponibles en esa fecha, respetando la latencia real de cada producto.
 - **Reproducibilidad:** parámetros en `config/config.yaml`, semillas fijas y versiones de datos registradas.
@@ -164,28 +168,30 @@ physiofire/
 ├── src/physiofire/
 │   ├── download/             # un módulo por fuente
 │   ├── preprocess/           # recorte, rejilla común, máscaras, QC
-│   ├── indices.py            # SIF/APAR, EVI, VPD, FWI
+│   ├── indices.py            # SIF/APAR, EVI, AED, FWI
 │   ├── anomalies.py
 │   └── anomalies.py
 ├── R/                        # tabla de incendios (fechas, selección, controles),
-│                             # época superpuesta, estratificación y figuras
+│                             # época superpuesta, estratificación y figuras (renv)
 ├── notebooks/                # exploración, numerados
 ├── figures/
 └── tests/
 ```
 
-Stack: Python 3.11 (`environment.yml`) con xarray, dask, rioxarray, zarr, netCDF4, pandas, geopandas, scipy, statsmodels, scikit-learn, matplotlib (solo vistas rápidas), cdsapi y earthaccess; R actual (`renv.lock`) con yaml, sf, terra, dplyr, tidyr, readr, ggplot2 y patchwork. Añadir una implementación del FWI canadiense solo tras verificar cuál usar.
+Stack: Python 3.11 (`environment.yml`) con xarray, dask, rioxarray, zarr, netCDF4, pandas, geopandas, scipy, statsmodels, scikit-learn, matplotlib (solo vistas rápidas), cdsapi, earthaccess y earthengine-api; R 4.6 (`renv.lock`) con yaml, sf, terra, dplyr, tidyr, readr, ggplot2 y patchwork. Añadir una implementación del FWI canadiense solo tras verificar cuál usar.
 
 ## Decisiones pendientes con el investigador
 
-- Fuente de la cartografía de Portugal.
+- Fuente de la cartografía de Portugal, o EFFIS para ambos países.
+- Si la cartografía de Ochoa incluye 2025.
 - Si las cartografías incluyen la fecha de inicio de cada incendio.
 - Fuente meteorológica del análisis principal (ERA5-Land, o AEMET + IPMA).
+- Si se usa la AED ya calculada por el grupo o se calcula con FAO-56 Penman-Monteith.
 - Superficie mínima y resto de umbrales de selección.
 - Máscara de nieve (ERA5-Land o GlobSnow).
 
 ## Contexto adicional
 
-- Colaboradores potenciales: Sergio Vicente-Serrano (IPE-CSIC, sequía y VPD), Wouter H. Maes (UAV Research Centre, Universidad de Gante, fluorescencia), Diego G. Miralles (H-CEL, Universidad de Gante, GLEAM) y el equipo de EFFIS en el JRC.
+- Colaboradores potenciales: Sergio Vicente-Serrano (IPE-CSIC, sequía y demanda evaporativa atmosférica), Wouter H. Maes (UAV Research Centre, Universidad de Gante, fluorescencia), Diego G. Miralles (H-CEL, Universidad de Gante, GLEAM) y el equipo de EFFIS en el JRC.
 - La misión FLEX de la ESA (lanzada en septiembre de 2026) podrá usarse más adelante para bajar de escala.
 - En `docs/` están la hoja de ruta 2026–2028 y el artículo de Tang et al.
