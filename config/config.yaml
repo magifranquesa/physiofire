@@ -140,10 +140,21 @@ sif_apar:
     robust_k_mad: null
   out_dir: data/processed
 anomalies:
-  loess_frac: 0.4          # LOESS window as fraction of the period
-  smooth_days: 15
-  smooth_pixels: 3         # 3 x 3 spatial window
-  alternative: median      # alternative anomaly against the period median (short climatology)
+  loess_frac: 0.4          # LOESS window as fraction of the (valid) observations, as in Tang et al.
+  loess_delta_days: 10     # statsmodels lowess `delta` (speed-up: linear interpolation between fits)
+  loess_min_obs: 365       # cells with fewer valid observations get no LOESS anomaly
+  clim_doy_window: 15      # seasonal cycle / DOY median pooled over DOY +- this many days, across years
+  smooth_days: 15          # descriptive maps only (centred); epoch analysis uses trailing windows
+  smooth_pixels: 3         # 3 x 3 spatial window, descriptive maps only
+  trailing_days: [15, 7]   # epoch analysis: trailing windows ending on the evaluated day (15 main, 7 sensitivity)
+  trailing_min_frac: 0.5   # minimum fraction of valid days in a trailing window
+  # Isolated-spike filter (Hampel type), applied after post-fire masking: residual to the running median of the
+  # cell's own series (+- half_window days) > k x robust noise scale of the cell -> removed. Persistent drops move
+  # the running median too, so they are kept.
+  spike_half_window: 3
+  spike_k: 6               # [TODO: confirm]
+  spike_min_neighbours: 3
+  methods: [loess, median_doy]   # both carried with equal weight
 
 epoch:
   window_days: 60          # days before fire start date
