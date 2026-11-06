@@ -72,16 +72,26 @@ def _to_grid(img: ee.Image, grid: Grid, max_pixels: int) -> ee.Image:
                .reproject(crs="EPSG:4326", crsTransform=[grid.res, 0, grid.lon_min, 0, -grid.res, grid.lat_max]))
 
 
-def fetch(img: ee.Image, grid: Grid, retries: int = 4) -> dict[str, np.ndarray]:
-    """Fetch an image on `grid` as a dict of 2-D float arrays oriented south to north (like Grid.lat)."""
+RATE_LIMIT_HITS = {"n": 0}   # count of throttling errors (HTTP 429 / quota), reported in the series log
+_RATE_MARKERS = ("429", "Too Many Requests", "rate limit", "quota", "Quota", "RESOURCE_EXHAUSTED")
+
+
+def fetch(img: ee.Image, grid: Grid, retries: int = 6) -> dict[str, np.ndarray]:
+    """Fetch an image on `grid` as a dict of 2-D float arrays oriented south to north (like Grid.lat).
+    Retries with increasing waits on transient errors; throttling errors are counted in RATE_LIMIT_HITS."""
     for attempt in range(1, retries + 1):
         try:
             arr = ee.data.computePixels({"expression": img, "fileFormat": "NUMPY_NDARRAY", "grid": _grid_spec(grid)})
             break
         except Exception as e:  # noqa: BLE001 - transient EE errors (quota, timeouts)
+            msg = str(e)
+            if any(m in msg for m in _RATE_MARKERS):
+                RATE_LIMIT_HITS["n"] += 1
+                log.warning("GEE throttling (hit %d), attempt %d: %s", RATE_LIMIT_HITS["n"], attempt, msg[:160])
+            else:
+                log.warning("computePixels attempt %d failed: %s", attempt, msg[:200])
             if attempt == retries:
                 raise
-            log.warning("computePixels attempt %d failed: %s", attempt, str(e)[:200])
             time.sleep(15 * attempt)
     return {name: np.flipud(arr[name].astype("f8")) for name in arr.dtype.names}
 
@@ -228,12 +238,12 @@ def run_timeseries(product: str, cfg: dict, start: dt.date, end: dt.date) -> Non
     write_grids(product, cfg, base_vars, layers, time_coord, start, end, extra_coords=extra)
 
 
-def write_grids(product, cfg, base_vars, layers, time_coord, start, end, extra_coords=None) -> None:
+def write_grids(product, cfg, base_vars, layers, time_coord, start, end, extra_coords=None, out_dir=None) -> None:
     """Write the fetch-grid data and every coarser grid in cfg['grids'] (block means)."""
     gcfg = cfg["gee"]
     fine_name = gcfg["fetch_grid"]
     fine = grid_from_config(cfg, fine_name)
-    out_dir = REPO_ROOT / gcfg["out_dir"]
+    out_dir = out_dir or (REPO_ROOT / gcfg["out_dir"])
     out_dir.mkdir(parents=True, exist_ok=True)
     for gname in cfg["grids"]:
         grid = grid_from_config(cfg, gname)
@@ -425,6 +435,96 @@ def run_burned(cfg: dict, start: dt.date, end: dt.date) -> None:
         log.info("wrote %s", out.relative_to(REPO_ROOT))
 
 
+# --------------------------------------------------------------------------- full series (parallel, per year)
+
+SERIES_PRODUCTS = ["fpar", "shortwave", "nbar", "mod09ga", "myd09ga"]   # priority order (a, b, c)
+
+
+def _series_collection(product: str, gcfg: dict, start: dt.date, end: dt.date) -> ee.ImageCollection:
+    if product == "fpar":
+        return fpar_images(gcfg, start, end, "fpar")
+    if product == "nbar":
+        return nbar_images(gcfg, start, end)
+    if product in ("mod09ga", "myd09ga"):
+        return sr_images(gcfg, product, start, end)
+    if product == "shortwave":
+        e = gcfg["era5land"]
+        return (ee.ImageCollection(e["collection"]).filterDate(str(start), str(end + dt.timedelta(days=1)))
+                .select(e["sw_band"]))
+    raise ValueError(product)
+
+
+def _series_fetch_one(product: str, col: ee.ImageCollection, t: int, fine: Grid, max_pixels: int) -> dict:
+    img = col.filter(ee.Filter.eq("system:time_start", t)).first()
+    if product == "shortwave":   # ERA5-Land is coarser than the grid: bilinear, explicit no-data
+        a = fetch(_reproject_bilinear(ee.Image(img).divide(86400).rename("sw"), fine).unmask(NODATA), fine)["sw"]
+        a[a <= NODATA + 1] = np.nan
+        return {"sw_mean": a, "sw_count": np.isfinite(a).astype("f8")}
+    return fetch(_to_grid(ee.Image(img), fine, max_pixels), fine)
+
+
+def run_series(cfg: dict, products: list[str], start: dt.date, end: dt.date, workers: int) -> None:
+    """Full series, one file per product, grid and year in data/interim/gee/series/. Years whose files exist are
+    skipped (relaunch-safe). Images are fetched in parallel; each one passes the plausibility check, and the run
+    stops at the first implausible image (product and date in the log)."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    gcfg = cfg["gee"]
+    fine = grid_from_config(cfg, gcfg["fetch_grid"])
+    out_dir = REPO_ROOT / gcfg["out_dir"] / "series"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    ranges = gcfg.get("plausible_median", {})
+    mx = int(gcfg["max_pixels"])
+    for product in products:
+        # fPAR composites: margin so that daily interpolation covers the first and last days
+        margin = dt.timedelta(days=8 if product == "fpar" else 0)
+        for year in range(start.year, end.year + 1):
+            y0 = max(start, dt.date(year, 1, 1)) - (margin if year == start.year else dt.timedelta(0))
+            y1 = min(end, dt.date(year, 12, 31)) + (margin if year == end.year else dt.timedelta(0))
+            tag = f"{product}_{{g}}_{year}.nc"
+            if all((out_dir / tag.format(g=g)).exists() for g in cfg["grids"]):
+                log.info("SKIP %s %d (files exist)", product, year)
+                continue
+            t0 = time.time()
+            hits0 = RATE_LIMIT_HITS["n"]
+            col = _series_collection(product, gcfg, y0, y1)
+            times = sorted(col.aggregate_array("system:time_start").getInfo())
+            log.info("START %s %d: %d images (%s .. %s), %d workers", product, year, len(times), y0, y1, workers)
+            results: dict[int, dict] = {}
+            with ThreadPoolExecutor(max_workers=workers) as ex:
+                futs = {ex.submit(_series_fetch_one, product, col, t, fine, mx): t for t in times}
+                for k, fut in enumerate(futs, 1):
+                    t = futs[fut]
+                    a = fut.result()
+                    day = dt.datetime.utcfromtimestamp(t / 1000).date()
+                    base = {kk.rsplit("_", 1)[0] for kk in a}
+                    check_plausible(product, day, {v: a[f"{v}_mean"] for v in base},
+                                    {v: a[f"{v}_count"] for v in base}, ranges)
+                    results[t] = {kk: v.astype("f4") for kk, v in a.items()}
+                    if k % 50 == 0:
+                        log.info("  %s %d: %d/%d images", product, year, k, len(times))
+            layers: dict[str, list] = {}
+            for t in times:
+                for kk, v in results[t].items():
+                    layers.setdefault(kk, []).append(v)
+            time_coord = np.array(times, dtype="datetime64[ms]").astype("datetime64[ns]")
+            extra = None
+            if product == "fpar":
+                center = time_coord + np.timedelta64(int(float(gcfg["fpar"]["composite_center_days"]) * 86400), "s")
+                extra = {"time_center": ("time", center)}
+            base_vars = sorted({kk.rsplit("_", 1)[0] for kk in layers})
+            pcfg = dict(gcfg)
+            if product == "shortwave":
+                pcfg["shortwave"] = {"collection": f"{gcfg['era5land']['collection']} {gcfg['era5land']['sw_band']}"}
+            # write to temporary names, then rename: an interrupted year never looks finished
+            write_grids(product, dict(cfg, gee=pcfg), base_vars, layers, time_coord, y0, y1, extra_coords=extra,
+                        out_dir=out_dir)
+            for g in cfg["grids"]:
+                (out_dir / f"{product}_{g}_{y0:%Y%m%d}_{y1:%Y%m%d}.nc").replace(out_dir / tag.format(g=g))
+            log.info("DONE %s %d: %d images in %.0f min, throttling hits this year: %d", product, year, len(times),
+                     (time.time() - t0) / 60, RATE_LIMIT_HITS["n"] - hits0)
+
+
 def check_file(path: str, ranges: dict) -> None:
     """Re-run the plausibility check on every time step of an existing fetch-grid file."""
     ds = xr.open_dataset(path)
@@ -489,13 +589,20 @@ def run_burn_history(cfg: dict, y0: int, y1: int) -> None:
 def main(argv=None) -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("product", choices=["fpar", "fpar_viirs", "nbar", "mod09ga", "myd09ga", "landcover", "mask",
-                                       "shortwave", "shortwave_monthly_1deg", "burned", "burn_history", "check"])
+                                       "shortwave", "shortwave_monthly_1deg", "burned", "burn_history", "check",
+                                       "series"])
     p.add_argument("--file", help="for 'check': NetCDF written by this module to re-check against plausible ranges")
+    p.add_argument("--products", nargs="+", default=SERIES_PRODUCTS, help="for 'series': products in priority order")
+    p.add_argument("--workers", type=int, default=8, help="for 'series': simultaneous requests")
+    p.add_argument("--log", help="for 'series': also write the log to this file")
     p.add_argument("--start", type=dt.date.fromisoformat)
     p.add_argument("--end", type=dt.date.fromisoformat)
     p.add_argument("--year", type=int)
     args = p.parse_args(argv)
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    handlers = [logging.StreamHandler()]
+    if args.log:
+        handlers.append(logging.FileHandler(args.log, encoding="utf-8"))
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s", handlers=handlers)
     cfg = load_config()
     if args.product == "check":
         check_file(args.file, cfg["gee"].get("plausible_median", {}))
@@ -503,6 +610,13 @@ def main(argv=None) -> None:
     initialize(cfg["gee"]["project"])
     if args.product in ("fpar", "fpar_viirs", "nbar", "mod09ga", "myd09ga"):
         run_timeseries(args.product, cfg, args.start, args.end)
+    elif args.product == "series":
+        try:
+            run_series(cfg, args.products, args.start, args.end, args.workers)
+        except ImplausibleValues as e:
+            log.error("STOPPED by plausibility check: %s", e)
+            raise
+        log.info("SERIES FINISHED; total throttling hits: %d", RATE_LIMIT_HITS["n"])
     elif args.product == "burn_history":
         y0, y1 = cfg["gee"]["burn_history_years"]
         run_burn_history(cfg, int(y0), int(y1))
