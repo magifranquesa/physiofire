@@ -199,7 +199,40 @@ Fuentes: páginas oficiales de FIRMS (`/api/`, `/api/map_key/`, `/api/area/`, `/
   - **Toda la Península, a 0,25°:** sesgo mediano por celda de −0,010 (−2,4 %) y correlación mediana de 0,67. SIF/APAR con VIIRS es un 4 % mayor (mediana).
   - **Matorral:** diferencias del −2 al −5 %. La correlación de las medias de 15 días de SIF/APAR es de 0,96 a 1,00.
   - **Arbolado** (País Vasco y Girona): VIIRS es un 9–16 % más alto y SIF/APAR un 10–14 % más bajo. La forma de la serie se conserva (r de 0,90 a 0,98).
-  - **Caídas de MCD15A3H en arbolado:** el fPAR de MODIS tiene caídas de 0,2 a 0,5 entre compuestos consecutivos (probablemente nubes o sombras no marcadas), que crean picos artificiales de SIF/APAR. VIIRS, de 8 días, es mucho más estable. **[TODO]** Valorar el filtro de nubes de `FparExtra_QC` en MCD15A3H.
+  - **Caídas de MCD15A3H en arbolado:** el fPAR de MODIS tiene caídas de 0,2 a 0,5 entre compuestos consecutivos (probablemente nubes o sombras no marcadas), que crean picos artificiales de SIF/APAR. VIIRS, de 8 días, es mucho más estable. (Antes del filtro de nubes; ver abajo).
+
+## Filtro de nubes de `FparExtra_QC` (aplicado el 6 de noviembre de 2026)
+
+**Bits verificados en las guías de usuario.** MODIS: [MOD15 C6.1 User Guide](https://lpdaac.usgs.gov/documents/926/MOD15_User_Guide_V61.pdf), tabla 5. VIIRS: VNP15 User Guide v1.1, tabla 5.
+
+| Indicador | MCD15A3H | VNP15A2H | Filtro aplicado |
+| --- | --- | --- | --- |
+| Nubes | bit 5, máscara interna (0 = sin nubes) | bits 0–1, confianza (0 despejado seguro, 1 probablemente despejado, 2 probablemente nuboso, 3 nuboso seguro) | MODIS = 0; VIIRS ≤ 1 |
+| Sombra de nube | bit 6 | bit 2 | = 0 |
+| Cirros | bit 4 | bit 3 | = 0 |
+| Aerosoles | bit 3: 0 ninguno o bajo, 1 medio o alto | bits 4–5: 0 climatología, 1 bajo, 2 medio, 3 alto | **no se aplica**; se guarda la fracción por celda (MODIS ≥ 1, VIIRS = 3) |
+| Nieve o hielo | bit 2 | bit 6 | no se aplica (verano); pendiente para la serie completa |
+
+MODIS tiene además el estado de nubes heredado de MOD09 en `FparLai_QC` (bits 3–4: 0 despejado, 1 nubes, 2 mixto, 3 no definido); de momento no se aplica.
+
+**Efecto en junio–septiembre de 2025** (`figures/qc/qc_fpar_cloud_filter_*.csv`):
+
+| Píxeles válidos eliminados | MODIS | VIIRS |
+| --- | --- | --- |
+| Total | 8,6 % | 13,5 % |
+| Arbolado | 17 % | 18,5 % |
+| Matorral | 7,5 % | 11,8 % |
+| Cultivos | 6,5 % | 11,2 % |
+
+- Septiembre es el mes en que más elimina (13 % en MODIS, 23 % en VIIRS).
+- **Frecuencia de compuestos válidos por celda:** apenas cambia (≥ 99,3 % de celda-compuesto con dato).
+- **Antigüedad del último compuesto válido antes de un posible día de ignición:** no cambia. MODIS: mediana de 3 días y percentil 90 de 5. VIIRS: mediana de 7 días y percentil 90 de 11. Los límites de persistencia (5 y 11 días) siguen siendo adecuados.
+- **Aerosoles:** si se aplicara el bit de MODIS, eliminaría un 16 % adicional (30 % en arbolado; 44 % en arbolado en agosto de 2025). El indicador "alto" de VIIRS marca un 3,2 % (7 % en agosto). Por eso no se usa como máscara: el de MODIS mezcla aerosol medio y alto.
+- **Caídas en los puntos de arbolado (MODIS):** se reducen pero no desaparecen. En el País Vasco, la desviación típica entre compuestos consecutivos pasa de 0,16 a 0,11, el mínimo de 0,30 a 0,54 y los cambios > 0,1 de 15 a 9. **[TODO]** Probar a añadir el estado de nubes de MOD09 (bits 3–4 de `FparLai_QC`).
+
+## Pendiente para la serie completa
+
+- Repetir por año la comparación Aqua − Terra del NDVI diario (MYD09GA − MOD09GA), para detectar efectos de la deriva orbital. En la muestra de 2025 la diferencia mediana es −0,001.
 
 ## Diferencias con Tang et al. (2026) que hay que documentar
 

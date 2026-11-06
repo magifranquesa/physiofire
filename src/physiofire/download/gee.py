@@ -107,7 +107,15 @@ def fpar_images(gcfg: dict, start: dt.date, end: dt.date, product: str = "fpar")
         scf = img.select("FparLai_QC").rightShift(int(f["scf_bit_start"])).bitwiseAnd(7)
         fpar = img.select("Fpar")
         ok = scf.lte(int(f["scf_qc_max"])).And(fpar.lte(float(f["valid_max_raw"])))
-        return fpar.multiply(float(f["scale"])).updateMask(ok).rename("fpar").copyProperties(img, ["system:time_start"])
+        extra = img.select("FparExtra_QC")
+        for q in f.get("extra_qc", []):                      # clouds, cirrus, cloud shadow
+            ok = ok.And(_bits(extra, int(q["bit"]), int(q["nbits"])).lte(int(q["max"])))
+        out = fpar.multiply(float(f["scale"])).updateMask(ok).rename("fpar")
+        a = f.get("aerosol_flag")
+        if a:   # per-pixel aerosol flag (0/1) on the retained pixels -> per-cell fraction (smoke indicator)
+            aer = _bits(extra, int(a["bit"]), int(a["nbits"])).gte(int(a["min"])).updateMask(ok).rename("aerosol")
+            out = out.addBands(aer)
+        return out.copyProperties(img, ["system:time_start"])
 
     return ee.ImageCollection(f["collection"]).filterDate(str(start), str(end + dt.timedelta(days=1))).map(prep)
 
@@ -247,7 +255,14 @@ def write_grids(product, cfg, base_vars, layers, time_coord, start, end, extra_c
         if "scale" in pc:
             ds.attrs.update(scale_factor_applied=float(pc["scale"]), valid_max_asset_units=float(pc["valid_max_raw"]),
                             asset_prescaled=int(float(pc["scale"]) == 1.0),
-                            scf_qc_bits=f"{pc['scf_bit_start']}-{int(pc['scf_bit_start']) + 2} <= {pc['scf_qc_max']}")
+                            scf_qc_bits=f"{pc['scf_bit_start']}-{int(pc['scf_bit_start']) + 2} <= {pc['scf_qc_max']}",
+                            extra_qc="; ".join(f"{q['name']}: bits {q['bit']}+{q['nbits']} <= {q['max']}"
+                                               for q in pc.get("extra_qc", [])) or "none")
+            if "aerosol" in ds:
+                a = pc["aerosol_flag"]
+                ds["aerosol"].attrs = {"long_name": "fraction of retained pixels with aerosol flag "
+                                       f"(FparExtra_QC bits {a['bit']}+{a['nbits']} >= {a['min']}); NOT used as mask",
+                                       "units": "1"}
         out = out_dir / f"{product}_{gname}_{start:%Y%m%d}_{end:%Y%m%d}.nc"
         ds.to_netcdf(out, encoding={v: {"zlib": True, "complevel": 4} for v in ds.data_vars})
         log.info("wrote %s", out.relative_to(REPO_ROOT))

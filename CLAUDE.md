@@ -222,6 +222,8 @@ Stack: Python 3.11 (`environment.yml`) con xarray, dask, rioxarray, zarr, netCDF
 - Máscara de nieve (ERA5-Land o GlobSnow).
 - Fuente definitiva de PAR: CERES Ed4B o ERA5-Land (serie homogénea y poca latencia), según la prueba del salto de abril de 2022. Mientras tanto, PAR provisional = 0,48 × radiación solar descendente de ERA5-Land.
 - Estratificación por vegetación: contrastar MCD12C1 (IGBP) con CORINE o ESA WorldCover antes de usarlo, porque las clases IGBP pueden confundir matorral y arbolado mediterráneos.
+- Con la serie completa: repetir por año la comparación Aqua − Terra del NDVI diario (MYD09GA − MOD09GA) para detectar efectos de la deriva orbital.
+- fPAR de MCD15A3H: valorar añadir el estado de nubes de MOD09 (bits 3–4 de `FparLai_QC`), porque el filtro de `FparExtra_QC` reduce pero no elimina las caídas en arbolado.
 
 ## Contexto adicional
 

@@ -90,10 +90,28 @@ Grids at 0.25° (as in Tang et al., 2026) and 0.05° were produced independently
 
 MODIS products were aggregated in Google Earth Engine (Gorelick et al., 2017) to the 0.05° grid. In each cell we took the area-weighted mean of valid 500 m pixels and their count (reprojection from the sinusoidal grid with `reduceResolution`). The 0.25° grid was then built locally as the count-weighted mean of the 5 × 5 contained 0.05° cells, which guarantees consistency between scales.
 
-**fPAR.** fPAR from MCD15A3H (Myneni et al., 2002) was retained only for retrievals of the main (radiative transfer) algorithm (SCF_QC, bits 5–7 of `FparLai_QC`, ≤ 1) and valid range (≤ 100 before scaling). Each 4-day composite was assigned to its central time (start + 1.5 days). Daily values were obtained by linear interpolation between composite centres, bridging gaps of up to 12 days, as in Tang et al. (2026).
+**fPAR.** fPAR from MCD15A3H (Myneni et al., 2002) was retained only for retrievals of the main (radiative transfer) algorithm (SCF_QC, bits 5–7 of `FparLai_QC`, ≤ 1) and valid range (≤ 100 before scaling).
+
+**[Implemented] Cloud screening.** Pixels flagged in `FparExtra_QC` were additionally removed: internal cloud mask (bit 5), cirrus (bit 4) and cloud shadow (bit 6) (MOD15 C6.1 User Guide, Table 5). In June–September 2025 this removed:
+
+| Vegetation type | Valid 500 m pixels removed |
+| --- | --- |
+| All land | 8.6% |
+| Woodland | 17% (25% in September) |
+| Shrubland | 7.5% |
+| Cropland | 6.5% |
+
+Because each grid cell aggregates many pixels, the fraction of cell-composites with data hardly changed (≥ 99.3%), and neither did the age of the last valid composite before a potential ignition day (median 3 days, 90th percentile 5 days). The persistence limit is therefore unaffected. At generic woodland points, the filter removed the deepest composite-to-composite fPAR drops (for example, minimum fPAR 0.30 → 0.54 and number of changes > 0.1 between consecutive composites 15 → 9), but residual variability remains **[TODO: also screen MOD09 cloud state, `FparLai_QC` bits 3–4]**.
+
+**[Implemented] Aerosol flag not used as a mask.** The aerosol bit of MCD15A3H (`FparExtra_QC` bit 3) only distinguishes "no or low" from "average or high" aerosol. Applying it would remove 16% of the retained pixels (30% in woodland; 44% in woodland in August 2025), including many smoke-free summer days, and it is not comparable with VIIRS, which flags high aerosol separately. Its per-cell fraction is stored instead and used as one of the smoke indicators (Section 2.11). Excluding flagged days is a sensitivity test, consistent with the smoke control applied to fires and controls alike. Each 4-day composite was assigned to its central time (start + 1.5 days). Daily values were obtained by linear interpolation between composite centres, bridging gaps of up to 12 days, as in Tang et al. (2026).
 
 **[Planned] VIIRS fPAR as a sensitivity test.** MCD15A3H remains the main fPAR source, because its 4-day compositing matches Tang et al. (2026). As a sensitivity test to the fPAR sensor, and as the basis for a future operational version after the end of MODIS, SIF/APAR is also computed with VIIRS S-NPP fPAR (VNP15A2H, collection 2, 500 m, 8-day composites; GEE asset `NASA/VIIRS/002/VNP15A2H`) as a separate variable.
 - **Quality filter:** equivalent to MCD15A3H (main radiative-transfer algorithm, SCF_QC ≤ 1). In VNP15A2H the SCF_QC field occupies bits 0–2 of `FparLai_QC` (VNP15 User Guide v1.1, Table 4), not bits 5–7 as in MCD15A3H.
+- **Cloud screening:** the equivalent of the MODIS filter, with VIIRS bit positions (`FparExtra_QC`, User Guide Table 5).
+  - Clouds: bits 0–1; "probably cloudy" and "confident cloudy" removed, "probably clear" kept.
+  - Cloud shadow: bit 2. Cirrus: bit 3.
+  - Effect: 13.5% of valid pixels removed (18.5% in woodland), with no change in the frequency of valid cell-composites.
+- **Aerosol flag:** the VIIRS flag is graded, and only "high" (value 3 of bits 4–5) is stored. It flagged 3.2% of retained pixels (7% in August 2025, 14% in woodland). It is not used as a mask, but it serves as a smoke indicator.
 - **Units:** the GEE asset is distributed already scaled (fraction 0–1, fill values 2.49–2.55), so no scale factor is applied and the valid range is fPAR ≤ 1.0.
 - **Empirical check:** we compared the distribution of SCF_QC and the fraction of valid pixels with MCD15A3H over the study region in June–September 2025, and found them nearly identical (main algorithm without saturation: 93.0% vs 93.6%; valid: 97.3% vs 96.9%).
 - **Processing:** composites are assigned to their centre (start + 3.5 days) and interpolated linearly to daily values, bridging gaps of up to 16 days (one missing composite).
@@ -122,6 +140,8 @@ We therefore add a daily, non-BRDF-adjusted NDVI/EVI from MODIS surface reflecta
 - **Role:** main optical competitor in the lead-time analysis, with MCD43A4 as a secondary reference.
 
 **Orbital drift.** Both platforms have drifted freely since their last manoeuvres (Terra in February 2020, Aqua in December 2021). Terra's local overpass time moves earlier, to about 09:00 by late 2025, from a nominal 10:30. Aqua's moves later, to about 15:50 by August 2026, from a nominal 13:30. During the 2025 case, Aqua no longer overpasses at the TROPOMI time (~13:30), and illumination geometry changes along the record, which can introduce trends in non-BRDF-adjusted indices. The LOESS detrending (Section 2.8) partly absorbs these trends. The mean overpass time per year over the region will be reported from `SolarZenith`/granule times **[TODO]**, and the platforms' end-of-mission status will be confirmed **[TODO: GEE holds MOD09GA/MYD09GA up to November 2026]**.
+
+In the 2025 sample, NDVI from the two platforms agreed when both observed the same cell on the same day (median Aqua − Terra difference −0.001; interquartile range −0.011 to 0.009), and combining them gave a valid observation on 62% of days per cell (Terra 39%, Aqua 35%). **[TODO: with the full record, repeat the Aqua − Terra NDVI comparison by year to detect effects of orbital drift.]**
 
 **[Planned] Effective temporal window of each product.** The temporal support of each input (Table 2) is reported, because it bounds the lead time that each variable can show.
 
