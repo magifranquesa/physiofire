@@ -1,0 +1,34 @@
+# Data: outside git, except the versioned fire selection table
+data/*
+!data/fires/
+data/fires/*
+!data/fires/selected_fires.csv
+
+# Personal drafts
+docs/correo_Maes.md
+
+# Credentials
+.netrc
+_netrc
+.cdsapirc
+*.key
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# R
+.Rhistory
+.RData
+.Rproj.user/
+.Rapp.history
+
+# OS / editors
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/

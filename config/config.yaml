@@ -1,0 +1,63 @@
+# PHYSIOFIRE proof of concept configuration.
+# Read from Python (physiofire.config.load_config) and R (R/config.R).
+# Paths are relative to the repository root.
+
+region:
+  name: iberian_peninsula
+  # Bounding box in degrees (EPSG:4326). Balearic and Canary Islands excluded.
+  lon_min: -10.0
+  lon_max: 4.5
+  lat_min: 35.5
+  lat_max: 44.5
+
+period:
+  start: "2018-05-01"   # start of TROPOMI SIF record
+  end: null             # null = latest available; set explicitly once data are verified
+
+grids:
+  # Both grids are aligned with the region bounds (cell edges at multiples of the resolution).
+  base:
+    resolution_deg: 0.25  # as in Tang et al. (2026)
+  fine:
+    resolution_deg: 0.05  # finer TROPOMI gridding (to be verified)
+
+# Parameters taken from Tang et al. (2026), Methods.
+sif:
+  wavelength_nm: 743
+  min_quality: 0.5
+  max_cloud_fraction: 0.5
+sif_apar:
+  clip_percentiles: [1, 99]
+anomalies:
+  loess_frac: 0.4          # LOESS window as fraction of the period
+  smooth_days: 15
+  smooth_pixels: 3         # 3 x 3 spatial window
+  alternative: median      # alternative anomaly against the period median (short climatology)
+
+epoch:
+  window_days: 60          # days before fire start date
+
+fires:
+  first_case_year: 2022
+  candidate_years: [2018, 2019, 2020, 2021, 2022, 2023, 2024]
+
+# Selection criteria: to be fixed (and documented in docs/fire_selection_criteria.md)
+# BEFORE looking at SIF/APAR. null = pending decision.
+fire_selection:
+  min_area_ha: null
+  min_pixel_fraction_base: null
+  min_pixel_fraction_fine: null
+  min_date_sources: 2
+  min_dominant_vegetation_fraction: null
+  overlap_exclusion_days: 60
+  firms_match_buffer_m: null
+  firms_match_max_days: null
+
+random_seed: 42
+
+paths:
+  raw: data/raw
+  interim: data/interim
+  processed: data/processed
+  fires: data/fires
+  figures: figures

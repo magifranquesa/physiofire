@@ -1,0 +1,31 @@
+# PHYSIOFIRE proof of concept: Python environment (data download and gridded processing).
+# Create:  C:\ProgramData\miniconda3\Scripts\conda.exe env create -f environment.yml
+# Exact versions are recorded in environment.lock.yml (conda env export).
+name: physiofire
+channels:
+  - conda-forge
+dependencies:
+  # --- Python: download, gridding, indices, anomalies ---
+  - python=3.11
+  - pip
+  - numpy
+  - pandas
+  - xarray
+  - dask
+  - netcdf4
+  - zarr
+  - rioxarray
+  - libgdal-hdf4      # GDAL HDF4 driver plugin, needed to read MODIS MCD15A3H (HDF4-EOS)
+  - geopandas
+  - scipy
+  - statsmodels
+  - scikit-learn
+  - matplotlib        # quick-look plots only; publication figures are made in R
+  - pyyaml
+  - earthaccess
+  - cdsapi
+  - pytest
+  - ipykernel
+# R (fire table, superposed epoch analysis, figures) is NOT managed here:
+# r-terra on conda-forge win-64 stopped at 1.5-21 (R 4.1). R uses a standard CRAN
+# install with CRAN binaries and renv (renv.lock) instead.
