@@ -152,7 +152,8 @@ Obligatorias en las tareas 5 y 6. Evitan una antelación artificial por fuga de 
    - Ningún suavizado espacial a 0,25° (3 × 3 son unos 75 km). A 0,05°, como mucho 3 × 3 y siempre después de enmascarar cada celda desde su propio día 0.
 2. **Sin fuga en fPAR ni en NBAR.**
    - **fPAR:** cortar la serie de compuestos en la fecha de enmascarado *antes* de interpolar a diario, quitando todo compuesto cuyo periodo termine en o después de esa fecha.
-   - **Final de la serie de fPAR:** tras el último compuesto válido, repetir su valor como máximo 5 días (persistencia). Dejar esos días sin dato es una prueba de sensibilidad.
+   - **Final de la serie de fPAR:** tras el último compuesto válido, repetir su valor como máximo 5 días con MODIS y 11 con VIIRS (persistencia). La prueba sin persistencia es la referencia para validar cualquier antelación, porque la persistencia sesga SIF/APAR hacia abajo, en la dirección de la señal buscada.
+   - **No suavizar el fPAR para reducir su ruido**, ni siquiera con ventanas hacia atrás. Un fPAR suavizado reacciona tarde a la pérdida de estructura: se queda más alto que el real y sesga SIF/APAR hacia abajo, igual que la persistencia. El ruido se reduce solo con filtros de calidad (SCF_QC, nubes, sombras y cirros), nunca promediando en el tiempo.
    - **NBAR de MCD43A4:** cada fecha usa 16 días de observaciones, ponderadas hacia el día 9 (de *t* − 8 a *t* + 7). Enmascarar desde el día 0 − 8.
    - **Competidor óptico diario:** añadir un NDVI/EVI diario sin ajuste BRDF (MOD09GA/MYD09GA en GEE, cada plataforma por separado, con filtro de nubes y de ángulos) como competidor principal de SIF/APAR.
    - **Deriva orbital:** documentar la deriva de Terra (hacia las ~9:00) y de Aqua (hacia las ~15:50).

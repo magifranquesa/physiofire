@@ -50,6 +50,10 @@ gee:
       - {name: cloud_shadow, bit: 6, nbits: 1, max: 0}
     # Aerosol bit NOT applied as a mask (MODIS lumps average and high): stored as per-cell fraction (smoke flag)
     aerosol_flag: {bit: 3, nbits: 1, min: 1}        # 1 = average or high aerosol
+    # FparLai_QC masks: MOD09 cloud state inherited in bits 3-4 (MOD15 C6.1 User Guide, Table 5 "FparLai_QC"):
+    # 0 clear, 1 significant clouds, 2 mixed, 3 not defined (assumed clear). Values listed in `exclude` removed.
+    lai_qc_exclude:
+      - {name: mod09_cloud_state, bit: 3, nbits: 2, exclude: [1, 2]}
   fpar_viirs:
     collection: NASA/VIIRS/002/VNP15A2H   # SENSITIVITY fPAR source (8-day, S-NPP, collection 2)
     scf_bit_start: 0          # VIIRS: SCF_QC is bits 0-2 (VNP15 User Guide v1.1, Table 4), NOT 5-7 as in MODIS

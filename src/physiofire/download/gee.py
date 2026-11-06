@@ -110,6 +110,11 @@ def fpar_images(gcfg: dict, start: dt.date, end: dt.date, product: str = "fpar")
         extra = img.select("FparExtra_QC")
         for q in f.get("extra_qc", []):                      # clouds, cirrus, cloud shadow
             ok = ok.And(_bits(extra, int(q["bit"]), int(q["nbits"])).lte(int(q["max"])))
+        laiqc = img.select("FparLai_QC")
+        for q in f.get("lai_qc_exclude", []):                # e.g. MOD09 cloud state (MODIS bits 3-4)
+            field = _bits(laiqc, int(q["bit"]), int(q["nbits"]))
+            for v in q["exclude"]:
+                ok = ok.And(field.neq(int(v)))
         out = fpar.multiply(float(f["scale"])).updateMask(ok).rename("fpar")
         a = f.get("aerosol_flag")
         if a:   # per-pixel aerosol flag (0/1) on the retained pixels -> per-cell fraction (smoke indicator)
@@ -257,7 +262,9 @@ def write_grids(product, cfg, base_vars, layers, time_coord, start, end, extra_c
                             asset_prescaled=int(float(pc["scale"]) == 1.0),
                             scf_qc_bits=f"{pc['scf_bit_start']}-{int(pc['scf_bit_start']) + 2} <= {pc['scf_qc_max']}",
                             extra_qc="; ".join(f"{q['name']}: bits {q['bit']}+{q['nbits']} <= {q['max']}"
-                                               for q in pc.get("extra_qc", [])) or "none")
+                                               for q in pc.get("extra_qc", [])) or "none",
+                            lai_qc_exclude="; ".join(f"{q['name']}: bits {q['bit']}+{q['nbits']} not in {q['exclude']}"
+                                                     for q in pc.get("lai_qc_exclude", [])) or "none")
             if "aerosol" in ds:
                 a = pc["aerosol_flag"]
                 ds["aerosol"].attrs = {"long_name": "fraction of retained pixels with aerosol flag "

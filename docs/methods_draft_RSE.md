@@ -101,7 +101,11 @@ MODIS products were aggregated in Google Earth Engine (Gorelick et al., 2017) to
 | Shrubland | 7.5% |
 | Cropland | 6.5% |
 
-Because each grid cell aggregates many pixels, the fraction of cell-composites with data hardly changed (≥ 99.3%), and neither did the age of the last valid composite before a potential ignition day (median 3 days, 90th percentile 5 days). The persistence limit is therefore unaffected. At generic woodland points, the filter removed the deepest composite-to-composite fPAR drops (for example, minimum fPAR 0.30 → 0.54 and number of changes > 0.1 between consecutive composites 15 → 9), but residual variability remains **[TODO: also screen MOD09 cloud state, `FparLai_QC` bits 3–4]**.
+Because each grid cell aggregates many pixels, the fraction of cell-composites with data hardly changed (≥ 99.3%), and neither did the age of the last valid composite before a potential ignition day (median 3 days, 90th percentile 5 days). The persistence limit is therefore unaffected. At generic woodland points, the filter removed the deepest composite-to-composite fPAR drops (for example, minimum fPAR 0.30 → 0.54 and number of changes > 0.1 between consecutive composites 15 → 9), but residual variability remains.
+
+**MOD09 cloud state.** We also removed pixels whose MOD09 cloud state, inherited in `FparLai_QC` bits 3–4, is "significant clouds" or "mixed". This removed a further 2.2% of pixels (1.9% in woodland) and had almost no effect on the woodland drops (standard deviation between consecutive composites 0.110 → 0.109) **[TODO: keep or drop; negligible effect]**. The residual variability of MCD15A3H in woodland is therefore not explained by flagged clouds.
+
+**[Rule] No temporal smoothing of fPAR.** fPAR is never smoothed to reduce noise, not even with trailing windows. A smoothed fPAR reacts late to structural loss, stays higher than the true value and biases SIF/APAR low, like persistence. Noise is reduced only through quality screening.
 
 **[Implemented] Aerosol flag not used as a mask.** The aerosol bit of MCD15A3H (`FparExtra_QC` bit 3) only distinguishes "no or low" from "average or high" aerosol. Applying it would remove 16% of the retained pixels (30% in woodland; 44% in woodland in August 2025), including many smoke-free summer days, and it is not comparable with VIIRS, which flags high aerosol separately. Its per-cell fraction is stored instead and used as one of the smoke indicators (Section 2.11). Excluding flagged days is a sensitivity test, consistent with the smoke control applied to fires and controls alike. Each 4-day composite was assigned to its central time (start + 1.5 days). Daily values were obtained by linear interpolation between composite centres, bridging gaps of up to 12 days, as in Tang et al. (2026).
 
@@ -116,6 +120,11 @@ Because each grid cell aggregates many pixels, the fraction of cell-composites w
 - **Empirical check:** we compared the distribution of SCF_QC and the fraction of valid pixels with MCD15A3H over the study region in June–September 2025, and found them nearly identical (main algorithm without saturation: 93.0% vs 93.6%; valid: 97.3% vs 96.9%).
 - **Processing:** composites are assigned to their centre (start + 3.5 days) and interpolated linearly to daily values, bridging gaps of up to 16 days (one missing composite).
 - **NOAA-20 and NOAA-21:** NOAA-20 (VJ115A2H) is not in GEE, and NOAA-21 (VJ215A2H) only starts in 2023. Because all VIIRS LAI/FPAR products share the same fixed 8-day calendar, combining platforms would reduce gaps but would not increase the temporal frequency.
+
+**Noise passed on to SIF/APAR (June–September 2025).**
+- **fPAR noise:** VNP15A2H injects 3–5 times less day-to-day noise into the fPAR series than MCD15A3H. The median standard deviation of daily changes in log fPAR is 0.008–0.010 for VIIRS and 0.022–0.036 for MODIS, with the largest difference in woodland.
+- **SIF/APAR noise:** it is dominated by SIF retrieval noise. With 7-day trailing means, the median relative standard deviation of day-to-day changes in woodland is 0.072 with VIIRS and 0.080 with MODIS at 0.25°, i.e. about 10% lower. It is 0.089 vs 0.091 at 0.05°, and the difference is ≤ 4% in other vegetation types.
+- **Interpretation:** part of VIIRS's stability comes from its 8-day compositing, which is itself a form of temporal averaging, with the delay discussed below.
 
 The lower temporal frequency matters most for the days just before ignition. With an 8-day product, the latest composite allowed by the cut-off rule (below) has its centre 4.5–11.5 days before ignition, against 2.5–5.5 days for MCD15A3H. Late structural changes are therefore captured later, or not at all.
 

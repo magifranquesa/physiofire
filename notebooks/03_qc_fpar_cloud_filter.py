@@ -10,6 +10,8 @@ Compares files fetched without (data/interim/gee/noextraqc/) and with the filter
 
 from __future__ import annotations
 
+import argparse
+
 import matplotlib
 
 matplotlib.use("Agg")
@@ -28,6 +30,15 @@ FILES = {"MCD15A3H": ("fpar_{g}_20250528_20250911.nc", 4, 1.5, cfg["sif_apar"]["
 VEG = {"woodland (1-5)": [1, 2, 3, 4, 5], "shrubland (6-7)": [6, 7], "savannas (8-9)": [8, 9],
        "grassland (10)": [10], "cropland (12,14)": [12, 14]}
 DAYS = pd.date_range("2025-06-01", "2025-09-07", freq="D")
+
+ap = argparse.ArgumentParser()
+ap.add_argument("--baseline", default="noextraqc", help="subfolder of data/interim/gee with the baseline files")
+ap.add_argument("--products", nargs="+", default=list(FILES))
+ap.add_argument("--labels", nargs=2, default=["no cloud filter", "cloud filter"])
+ap.add_argument("--suffix", default="", help="suffix for output files")
+ARGS = ap.parse_args()
+FILES = {k: v for k, v in FILES.items() if k in ARGS.products}
+LAB_OLD, LAB_NEW = ARGS.labels
 
 
 def veg_class(g):
@@ -61,7 +72,7 @@ pts = pd.read_csv(QC / "qc_points.csv")
 fig, axes = plt.subplots(2, len(pts), figsize=(3.3 * len(pts), 5), sharex=True, squeeze=False)
 for k, (prod, (pat, period, center, persist)) in enumerate(FILES.items()):
     for g in ["fine", "base"]:
-        old = xr.open_dataset(G / "noextraqc" / pat.format(g=g))
+        old = xr.open_dataset(G / ARGS.baseline / pat.format(g=g))
         new = xr.open_dataset(G / pat.format(g=g))
         land = (xr.open_dataset(G / f"mask_peninsula_{g}.nc").land_fraction >= 0.5).values
         co, cn = old.fpar_count.values, new.fpar_count.values
@@ -79,7 +90,7 @@ for k, (prod, (pat, period, center, persist)) in enumerate(FILES.items()):
                                          "aerosol_flag_pct_of_retained": 100 * aer})
         # composite frequency and age of last valid composite
         starts = pd.DatetimeIndex(old.time.values)
-        for label, c in [("no cloud filter", co), ("cloud filter", cn)]:
+        for label, c in [(LAB_OLD, co), (LAB_NEW, cn)]:
             valid = (c > 0)[:, land]
             age = age_last_valid(valid, starts, period, center)
             fin = np.isfinite(age)
@@ -93,26 +104,26 @@ for k, (prod, (pat, period, center, persist)) in enumerate(FILES.items()):
             for j, p in pts.iterrows():
                 so = old.fpar.where(old.fpar_count > 0).sel(lat=p.lat, lon=p.lon, method="nearest").to_series()
                 sn = new.fpar.where(new.fpar_count > 0).sel(lat=p.lat, lon=p.lon, method="nearest").to_series()
-                for label, s in [("no cloud filter", so), ("cloud filter", sn)]:
+                for label, s in [(LAB_OLD, so), (LAB_NEW, sn)]:
                     d = s.dropna().diff().dropna()
                     rows_drop.append({"product": prod, "point": p.point, "filter": label,
                                       "n_valid": int(s.notna().sum()), "sd_diff": float(d.std()),
                                       "n_abs_diff_gt_0.1": int((d.abs() > 0.1).sum()), "min": float(s.min()),
                                       "mean": float(s.mean())})
                 ax = axes[k, j]
-                ax.plot(so.index, so, "o-", ms=2.5, lw=0.8, color="0.6", label="no cloud filter")
-                ax.plot(sn.index, sn, "o-", ms=2.5, lw=1.2, color="C0" if k == 0 else "C1", label="cloud filter")
+                ax.plot(so.index, so, "o-", ms=2.5, lw=0.8, color="0.6", label=LAB_OLD)
+                ax.plot(sn.index, sn, "o-", ms=2.5, lw=1.2, color="C0" if k == 0 else "C1", label=LAB_NEW)
                 ax.set_title(f"{prod} {p.point}", fontsize=8)
                 if j == 0:
                     ax.set_ylabel("fPAR (composites)")
                     ax.legend(fontsize=6)
 fig.autofmt_xdate()
 fig.tight_layout()
-fig.savefig(QC / "qc_fpar_cloud_filter_points.png", dpi=80)
+fig.savefig(QC / f"qc_fpar_cloud_filter{ARGS.suffix}_points.png", dpi=80)
 
 pd.set_option("display.width", 200)
 rem = pd.DataFrame(rows_removed)
-rem.to_csv(QC / "qc_fpar_cloud_filter_removed.csv", index=False)
+rem.to_csv(QC / f"qc_fpar_cloud_filter{ARGS.suffix}_removed.csv", index=False)
 for prod in FILES:
     r = rem[rem["product"] == prod]
     print(f"\n{prod}: % of valid 500 m pixels removed by the cloud/cirrus/shadow filter (rows: vegetation, cols: month)")
@@ -120,10 +131,10 @@ for prod in FILES:
     print(f"{prod}: % of RETAINED pixels with aerosol flag (would be removed by an aerosol mask)")
     print(r.pivot(index="vegetation", columns="month", values="aerosol_flag_pct_of_retained").round(1).to_string())
 fr = pd.DataFrame(rows_freq)
-fr.to_csv(QC / "qc_fpar_cloud_filter_frequency.csv", index=False)
+fr.to_csv(QC / f"qc_fpar_cloud_filter{ARGS.suffix}_frequency.csv", index=False)
 print("\nValid composites and age of last valid composite at day -1 (all land cells, ignition days Jun 1-Sep 7)")
 print(fr.round(2).to_string(index=False))
 dr = pd.DataFrame(rows_drop)
-dr.to_csv(QC / "qc_fpar_cloud_filter_drops.csv", index=False)
+dr.to_csv(QC / f"qc_fpar_cloud_filter{ARGS.suffix}_drops.csv", index=False)
 print("\nComposite-to-composite changes at generic points (base grid)")
 print(dr.round(3).to_string(index=False))

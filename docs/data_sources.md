@@ -230,6 +230,26 @@ MODIS tiene además el estado de nubes heredado de MOD09 en `FparLai_QC` (bits 3
 - **Aerosoles:** si se aplicara el bit de MODIS, eliminaría un 16 % adicional (30 % en arbolado; 44 % en arbolado en agosto de 2025). El indicador "alto" de VIIRS marca un 3,2 % (7 % en agosto). Por eso no se usa como máscara: el de MODIS mezcla aerosol medio y alto.
 - **Caídas en los puntos de arbolado (MODIS):** se reducen pero no desaparecen. En el País Vasco, la desviación típica entre compuestos consecutivos pasa de 0,16 a 0,11, el mínimo de 0,30 a 0,54 y los cambios > 0,1 de 15 a 9. **[TODO]** Probar a añadir el estado de nubes de MOD09 (bits 3–4 de `FparLai_QC`).
 
+## Estado de nubes de MOD09 en MCD15A3H y ruido en SIF/APAR (6 de noviembre de 2026)
+
+**Estado de nubes de MOD09** (bits 3–4 de `FparLai_QC`; se excluyen 1 = nubes significativas y 2 = mixto; `qc_fpar_cloud_filter_mod09cs_*.csv`):
+- Elimina un 2,2 % más de píxeles que el filtro de `FparExtra_QC` (1,9 % en arbolado, 1,7 % en matorral; 4,1 % en septiembre).
+- La frecuencia de compuestos y la antigüedad antes de la ignición no cambian (mediana de 3 días, percentil 90 de 5).
+- Las caídas en arbolado apenas cambian. País Vasco: desviación típica entre compuestos de 0,110 a 0,109 y cambios > 0,1 de 9 a 7. Girona: 0,104 y de 7 a 6.
+
+**Ruido que llega a SIF/APAR con cada fuente de fPAR** (`qc_sif_apar_noise_by_fpar_*.csv`; mediana por celda en los días en que las tres fuentes tienen dato):
+
+| Vegetación (0,25°) | DE de Δ log fPAR diario: MODIS / VIIRS | DE relativa de Δ de SIF/APAR, media de 7 días hacia atrás: MODIS / VIIRS | Saltos > 10 %: MODIS / VIIRS |
+| --- | --- | --- | --- |
+| Arbolado | 0,036 / 0,008 | 0,080 / 0,072 | 14 / 13 |
+| Matorral | 0,022 / 0,009 | 0,088 / 0,087 | 18 / 18 |
+| Sabanas | 0,027 / 0,008 | 0,075 / 0,072 | 12 / 10 |
+| Total | 0,023 / 0,009 | 0,084 / 0,082 | 15 / 14 |
+
+- A 0,05° las diferencias en SIF/APAR son menores del 3 %.
+- Las dos versiones de MODIS (con y sin estado de nubes) dan prácticamente lo mismo.
+- **Conclusión:** VIIRS da un fPAR mucho más estable, pero en SIF/APAR la mejora es modesta (≈ 10 % en arbolado a 0,25° y menos en el resto), porque domina el ruido de la SIF.
+
 ## Pendiente para la serie completa
 
 - Repetir por año la comparación Aqua − Terra del NDVI diario (MYD09GA − MOD09GA), para detectar efectos de la deriva orbital. En la muestra de 2025 la diferencia mediana es −0,001.
