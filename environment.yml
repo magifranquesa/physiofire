@@ -20,6 +20,7 @@ dependencies:
   - geopandas
   - scipy
   - statsmodels
+  - xclim=1.0.0       # Canadian FWI System (xclim.compute.fire.cffwis_indices); pinned: module layout changed in 1.0
   - scikit-learn
   - matplotlib        # quick-look plots only; publication figures are made in R
   - pyyaml

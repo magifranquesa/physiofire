@@ -455,3 +455,18 @@ Tang es la base conceptual, no un método a replicar (CLAUDE.md, 7 de noviembre 
 - Filtro de picos por celda en lugar del filtro de percentiles 1–99 global.
 - Rejilla de 0,05° en lugar de 0,25°.
 - Vegetación del mapa de combustibles de FirEUrisk (con CORINE 2018 como apoyo) en lugar de MCD12C1.
+
+## FWI propio (ERA5-Land) y FWI de CEMS (7 de noviembre de 2026)
+
+**FWI del análisis principal: ERA5-Land horario** ✅
+- GEE `ECMWF/ERA5_LAND/HOURLY`. Bandas: `temperature_2m`, `dewpoint_temperature_2m`, `u_component_of_wind_10m`, `v_component_of_wind_10m` (a las 12:00 UTC) y `total_precipitation_hourly` (lluvia de la hora que termina en la marca de tiempo; comprobado con la banda acumulada).
+- Rejilla nativa de 0,1° con centros en múltiplos de 0,1° (`crs_transform` [0,1, 0, −360,05, 0, −0,1, 90,05]): 146 × 91 celdas, 7814 de tierra.
+- `python -m physiofire.download.era5land_fwi --start ... --end ...`: una petición por mes, un archivo por mes en `data/interim/era5land_fwi/fwi_inputs_YYYYMM.nc` (≈ 2,4 MB). Es reanudable.
+- `python -m physiofire.preprocess.fwi --start ... --end ...`: aplica xclim 1.0.0 (`xclim.compute.fire.cffwis_indices`; en xclim 1.0 el módulo pasó de `xclim.indices.fire` a `xclim.compute.fire`).
+- Validado con cffdrs 1.9.2 (`R/check_fwi_cffdrs.R`). La única diferencia es la constante del FFMC (147,2 frente a 147,27723); ver `docs/supplementary_qc.md`, S1.10.
+
+**FWI de CEMS (referencia operativa, sensibilidad R17)** ✅
+- EWDS, dataset `cems-fire-historical-v1` (`product_type` reanalysis, `system_version` 4_1, `dataset_type` consolidated_dataset; intermediate_dataset para lo más reciente), `grid` 0.25/0.25, NetCDF.
+- Variables en el archivo: `fwinx`, `ffmcode`, `dufmcode` y `drtcode`. Coordenadas `valid_time`, `latitude` (de 44,75 a 35,25) y `longitude` (de −10,25 a 4,75).
+- La misma clave del CDS sirve en el EWDS (URL `https://ewds.climate.copernicus.eu/api`). Hay que aceptar una vez las condiciones de uso del EWDS (aceptadas el 7 de noviembre de 2026).
+- `python -m physiofire.download.cems_fwi --year 2025 --months 8` → `data/raw/cems_fwi/cems_fwi_YYYYMM.nc`.

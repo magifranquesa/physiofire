@@ -361,6 +361,36 @@ fire_selection:
   firms_match_buffer_m: null
   firms_match_max_days: null
 
+# Fire Weather Index of the MAIN analysis (decided 2026-11-07): Canadian FWI System (xclim.compute.fire.cffwis_indices,
+# xclim 1.0.0; follows the official CFS R code, cross-checked against the R package cffdrs) from ERA5-Land hourly
+# on its native 0.1 deg grid (cell centres at multiples of 0.1 deg; no resampling).
+# Inputs (daily): temperature, relative humidity (from the 2 m dew point) and 10 m wind speed at noon_utc_hour; 24 h
+# precipitation = sum of the hourly images T(noon+1) of day d-1 .. T(noon) of day d (GEE `_hourly` bands hold the
+# amount of the hour ENDING at the image time; checked on 2025-03-05/06).
+# Continuous calculation from `start` with the standard start-up codes (FFMC 85, DMC 6, DC 15), no fire-season
+# start-up/shutdown and no overwintering. The CEMS FWI (EWDS) is the operational reference and a sensitivity test.
+fwi:
+  collection: ECMWF/ERA5_LAND/HOURLY
+  bands:
+    tas: temperature_2m                   # K
+    tdew: dewpoint_temperature_2m         # K
+    u10: u_component_of_wind_10m          # m s-1
+    v10: v_component_of_wind_10m          # m s-1
+    pr_hourly: total_precipitation_hourly # m, hour ending at the image time
+  noon_utc_hour: 12        # local solar noon in the region: 11:42 (4.5 E) to 12:40 (10 W) UTC
+  start: "2017-01-01"      # spin-up of ~16 months before the TROPOMI record
+  native_res_deg: 0.1
+  inputs_dir: data/interim/era5land_fwi    # monthly input files fwi_inputs_YYYYMM.nc
+  out_dir: data/interim/era5land_fwi
+  cems:                    # operational reference (sensitivity R17)
+    url: https://ewds.climate.copernicus.eu/api
+    dataset: cems-fire-historical-v1
+    product_type: reanalysis
+    dataset_type: [consolidated_dataset, intermediate_dataset]   # tried in this order
+    system_version: "4_1"
+    grid: "0.25/0.25"
+    raw_dir: data/raw/cems_fwi
+
 random_seed: 42
 
 paths:

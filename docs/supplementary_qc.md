@@ -131,3 +131,20 @@ Synthetic daily series (seasonal cycle plus Gaussian noise, January 2019 – Sep
 **Generic points** for the chain checks were chosen by a fixed rule, deliberately not at fire locations: 0.25° cells with ≥ 95% land, unburned (MCD64A1, January–September 2025) in the cell and its eight neighbours, highest class purity (MCD12C1 woodland ≥ 60%, shrubland ≥ 50%), at least 2° apart, three per class.
 
 **Control availability.** With the criteria of Section 2.9 (FirEUrisk fuel class, relative aridity tolerance ±15%), 37 of the 53 short-listed perimeters obtained at least three controls (all 53 have burned cells): 26 of 33 in the shrubland stratum (17 shrubland, 9 heathland), 2 of 5 in woodland (both closed forest, in Spain, with 4 and 1 burned cells), 4 of 8 in grassland and all 5 cropland fires. An earlier design (CORINE groups, absolute aridity tolerance ±0.1) gave 30 fires with controls and none in woodland; CORINE groups with the relative aridity tolerance give 35 (1 in woodland). Under that earlier design no single criterion explained the failures: relaxing one at a time increased the number of fires with controls to 36 (aridity ±0.2), 33 (elevation ±300 m), 37 (unburned since 2020 instead of 2017) and 38 (up to 5% burned in the cell instead of 0). The criteria were not relaxed. At 0.25°, only 8 perimeters have a cell at least 25% burned, and almost every 0.25° cell of northwestern Iberia contains burned area since 2017; the 0.25° grid is therefore a sensitivity analysis with its own control design (R5).
+
+## S1.10. Fire Weather Index
+
+**Inputs.** ERA5-Land hourly fields were taken from Google Earth Engine on the native 0.1° grid (cell centres at multiples of 0.1°; 7,814 land cells in the study region), without resampling. Values fetched at two cells and dates matched direct point queries exactly. The `_hourly` precipitation band of each image holds the amount of the hour ending at the image time (checked against the accumulated band on 5–6 March 2025), so the 24 h precipitation at noon is the sum of the images from 13:00 UTC of the previous day to 12:00 UTC. No land cell-day lacks an input.
+
+**Implementation.** xclim 1.0.0 (`xclim.compute.fire.cffwis_indices`) was compared with the reference R implementation of the Canadian Forest Service (cffdrs 1.9.2, function `fwi`, batch mode with the same start-up codes and latitude adjustment) on 34 ERA5-Land cells (30 random land cells, seed 42, and 4 cells in the 2025 fire area) from 1 January to 31 August 2025 (8,262 cell-days), with identical noon inputs:
+
+| Index | Max. absolute difference | 99th percentile |
+| --- | --- | --- |
+| DMC | 0.0002 | 0.00005 |
+| DC | 0.0004 | 0.0002 |
+| BUI | 0.0002 | 0.00005 |
+| FFMC | 0.43 | 0.18 |
+| ISI | 0.75 | 0.30 |
+| FWI | 1.7 | 0.66 |
+
+The FFMC difference has a single origin. xclim keeps the coefficient 147.2 of the original equations (Van Wagner, 1987) in the conversion between FFMC and fine fuel moisture content (Eqs. 1 and 10), whereas cffdrs uses 147.27723 (= 250 × 59.5/101), introduced in the revised official code (Wang et al., 2015). With the cffdrs coefficient set to 147.2, the maximum differences fall to 1.1 × 10⁻⁵ (FFMC) and 5 × 10⁻⁵ (FWI), i.e. storage precision. xclim was used unmodified; the difference does not affect any decision of the 2025 case, because anomalies are standardised per cell. Script: `R/check_fwi_cffdrs.R`.
