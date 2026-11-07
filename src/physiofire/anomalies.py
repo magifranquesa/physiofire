@@ -7,9 +7,10 @@ Order of operations for one variable, per cell (arrays shaped (time, ncell)):
   2. Input validity (optional thresholds on fPAR, PAR, TROPOMI pixel weight).
   3. Isolated-spike filter (Hampel type): residual to the running median of the cell's own series;
      persistent anomalies are kept because the running median follows them.
-  4. Anomalies, two definitions with equal weight:
-       loess       x - LOESS trend - mean seasonal cycle of the detrended series (Tang et al., 2026)
-       median_doy  x - median over all years of the values within DOY +- window
+  4. Anomalies, two definitions:
+       median_doy  x - median over all years of the values within DOY +- window (MAIN in the epoch analysis)
+       loess       x - LOESS trend - mean seasonal cycle of the detrended series (after Tang et al., 2026;
+                   SENSITIVITY in the epoch analysis, with the trend fitted only before `trend_end`)
   5. Trailing means (windows ending on the evaluated day) for the epoch analysis.
 No step uses data on or after the cut-off date; `tests/test_anomalies.py` checks this explicitly.
 """
@@ -96,9 +97,11 @@ def anomaly_median_doy(x: np.ndarray, days: np.ndarray, window: int) -> np.ndarr
     return x - clim[doys]
 
 
-def loess_trend(x: np.ndarray, days: np.ndarray, frac: float, delta_days: float, min_obs: int) -> np.ndarray:
+def loess_trend(x: np.ndarray, days: np.ndarray, frac: float, delta_days: float, min_obs: int,
+                hold_forward: bool = False) -> np.ndarray:
     """LOESS trend per cell on its valid values, evaluated (linear interpolation) at every day within the range of
-    valid values; NaN outside it and for cells with fewer than min_obs valid values."""
+    valid values; NaN outside it and for cells with fewer than min_obs valid values. hold_forward: after the last
+    valid value, the trend is held at its last fitted value (used when the fit stops before the evaluated days)."""
     t = (np.asarray(days, dtype="datetime64[D]") - np.asarray(days, dtype="datetime64[D]")[0]).astype(float)
     out = np.full(x.shape, np.nan)
     for j in range(x.shape[1]):
@@ -109,15 +112,30 @@ def loess_trend(x: np.ndarray, days: np.ndarray, frac: float, delta_days: float,
         lo, hi = fit[0, 0], fit[-1, 0]
         inside = (t >= lo) & (t <= hi)
         out[inside, j] = np.interp(t[inside], fit[:, 0], fit[:, 1])
+        if hold_forward:
+            out[t > hi, j] = fit[-1, 1]
     return out
 
 
 def anomaly_loess(x: np.ndarray, days: np.ndarray, frac: float, delta_days: float, min_obs: int,
-                  window: int) -> np.ndarray:
+                  window: int, deseasonalize_first: bool = False, trend_end: np.ndarray | None = None) -> np.ndarray:
     """Tang et al. (2026): x - LOESS trend - mean daily seasonal cycle of the detrended series
-    (pooled over DOY +- window across years)."""
-    detr = x - loess_trend(x, days, frac, delta_days, min_obs)
+    (pooled over DOY +- window across years).
+
+    deseasonalize_first: fit the LOESS trend on x minus a preliminary mean DOY cycle (one STL-like iteration).
+    Needed when the evaluated days are at the END of the series (epoch analysis, series cut at ignition): there the
+    local fit of the raw series absorbs part of the seasonal cycle (boundary effect) and biases the anomalies.
+
+    trend_end: (ncell,) datetime64[D]; the trend is fitted only on values BEFORE this date and held at its last value
+    afterwards, so a pre-fire signal in the evaluated window cannot be absorbed by the trend (epoch analysis:
+    trend_end = day -60)."""
     doys = day_of_year(days)
+    xt = x
+    if deseasonalize_first:
+        xt = x - _doy_pooled(x, doys, window, np.nanmean)[doys]
+    if trend_end is not None:
+        xt = apply_cutoff(xt, days, trend_end)
+    detr = x - loess_trend(xt, days, frac, delta_days, min_obs, hold_forward=trend_end is not None)
     cycle = _doy_pooled(detr, doys, window, np.nanmean)
     return detr - cycle[doys]
 
@@ -131,10 +149,10 @@ def trailing_mean(x: np.ndarray, window: int, min_frac: float) -> np.ndarray:
 # --------------------------------------------------------------------------- pipeline
 
 def compute(x: np.ndarray, days: np.ndarray, acfg: dict, cutoff: np.ndarray | None = None,
-            valid: np.ndarray | None = None) -> dict[str, np.ndarray]:
+            valid: np.ndarray | None = None, trend_end: np.ndarray | None = None) -> dict[str, np.ndarray]:
     """Full chain for one variable. x: (time, ncell). Returns the masked/filtered input, the spike mask, raw
     anomalies per method and their trailing means per window: keys 'x', 'spikes', '<method>',
-    '<method>_trail<w>'."""
+    '<method>_trail<w>'. trend_end: see anomaly_loess (None = trend fitted on all data before the cut-off)."""
     x = apply_cutoff(np.asarray(x, dtype=float), days, cutoff)
     if valid is not None:
         x = np.where(valid, x, np.nan)
@@ -144,7 +162,8 @@ def compute(x: np.ndarray, days: np.ndarray, acfg: dict, cutoff: np.ndarray | No
     for m in acfg["methods"]:
         if m == "loess":
             a = anomaly_loess(x, days, float(acfg["loess_frac"]), float(acfg["loess_delta_days"]),
-                              int(acfg["loess_min_obs"]), int(acfg["clim_doy_window"]))
+                              int(acfg["loess_min_obs"]), int(acfg["clim_doy_window"]),
+                              bool(acfg.get("loess_deseasonalize_first", False)), trend_end)
         elif m == "median_doy":
             a = anomaly_median_doy(x, days, int(acfg["clim_doy_window"]))
         else:

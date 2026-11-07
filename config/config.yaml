@@ -113,15 +113,15 @@ gee:
   myd09ga:
     collection: MODIS/061/MYD09GA   # Aqua; overpass drifting later (~15:50 by Aug 2026)
 
-# PAR source. PROVISIONAL: PAR = par_fraction x ERA5-Land daily downward shortwave (daily mean W m-2),
-# until CERES SYN1deg Ed4B is downloaded and the April 2022 discontinuity test is done.
+# PAR source (main analysis, 7 November 2026): PAR = par_fraction x ERA5-Land daily downward shortwave (daily mean
+# W m-2): homogeneous record over the whole period and low latency. CERES SYN1deg Ed4B (April 2022 change of inputs,
+# ends 31 August 2026) is a sensitivity analysis (backlog 3, R12).
 # par_fraction: PAR/global shortwave energy ratio; typical literature values 0.45-0.50 (reference to be
-# added). A constant factor rescales SIF/APAR uniformly, so it does not change its temporal anomalies'
-# sign or timing, but absolute SIF/APAR values are not comparable with Tang et al. (CERES PAR).
+# added). A constant factor rescales SIF/APAR uniformly, so it does not change its standardised anomalies.
 par:
-  source: era5land_shortwave_fraction   # PROVISIONAL; alternatives: ceres_syn1deg_ed4b
+  source: era5land_shortwave_fraction   # sensitivity: ceres_syn1deg_ed4b
   par_fraction: 0.48
-  provisional: true
+  provisional: false
   ceres_jump_test_grid_deg: 1.0   # CERES SYN1deg native grid
 
 # Parameters taken from Tang et al. (2026), Methods.
@@ -152,9 +152,13 @@ sif_apar:
     robust_k_mad: null
   out_dir: data/processed
 anomalies:
-  loess_frac: 0.4          # LOESS window as fraction of the (valid) observations, as in Tang et al.
+  loess_frac: 0.4          # LOESS window as fraction of the (valid) observations (span used by Tang et al.)
   loess_delta_days: 10     # statsmodels lowess `delta` (speed-up: linear interpolation between fits)
   loess_min_obs: 365       # cells with fewer valid observations get no LOESS anomaly
+  loess_deseasonalize_first: true   # trend fitted on the deseasonalised series (one STL-like iteration). With the
+                           # series cut at ignition the epoch window is at the series END, where the LOESS fit of the
+                           # raw series absorbs part of the seasonal cycle: synthetic controls biased by -0.3 to -0.4
+                           # noise SD without this. false = Tang et al. original
   clim_doy_window: 15      # seasonal cycle / DOY median pooled over DOY +- this many days, across years
   smooth_days: 15          # descriptive maps only (centred); epoch analysis uses trailing windows
   smooth_pixels: 3         # 3 x 3 spatial window, descriptive maps only
@@ -166,10 +170,80 @@ anomalies:
   spike_half_window: 3
   spike_k: 6               # [TODO: confirm]
   spike_min_neighbours: 3
-  methods: [loess, median_doy]   # both carried with equal weight
+  methods: [median_doy, loess]   # epoch analysis: median_doy MAIN, loess SENSITIVITY (epoch.series)
 
 epoch:
-  window_days: 60          # days before fire start date
+  # Simplified analysis of the 2025 case (manually selected fires; data/fires/selected_fires.csv).
+  # Thresholds DECIDED BEFORE THE ANALYSIS (7 November 2026), before any vegetation or meteorological series was
+  # extracted for the fires.
+  window_days: 60          # days before ignition (day 0 = ignition date; days -60 .. -1 analysed)
+  grids: [fine]            # 0.05 deg is the main (only) scale of the proof of concept; 0.25 deg -> backlog
+  selected_fires: data/fires/selected_fires.csv   # columns: fire_id (= EFFIS id), ignition_date, ...
+  burned_min_fraction: {fine: 0.25}               # burned cell: fraction of the cell inside the perimeter
+  controls:                # per fire, compared with the (burned-fraction weighted) mean of its burned cells
+    n_min: 3               # fewer valid candidates -> fire reported without controls (no relaxation)
+    n_max: 5
+    min_dist_km: 10        # nearest point of the CELL to the perimeter: whole cell outside the immediate strip
+    max_dist_km: 50        # cell centre to the perimeter
+    unburned_since: 2017   # no burn in any year from this one to the fire year, by any of: EFFIS perimeters,
+                           # MCD64A1, VNP64A1 (yearly burn history) and ESFire30 perimeters (Spain only) ...
+    max_burned_fraction: {fine: 0.0}   # ... above this fraction of the cell (0 = not a single burned pixel)
+    min_land_fraction: 0.5
+    max_aridity_abs_diff: 0.1    # |AI_control - AI_burned| (Global-AI v3.1, P / ET0)
+    max_elevation_diff_m: 200    # |elevation_control - elevation_burned| (SRTM 90 m cell mean)
+    vegetation: corine           # dominant group of epoch.corine.groups (CORINE 2018) in burned cells and controls
+  esfire30:                # Landsat 30 m annual burned-area perimeters, peninsular Spain (Ochoa et al.; CC BY 4.0)
+    doi: 10.5281/zenodo.20257001
+    raw_dir: data/raw/esfire30/zenodo_20257001
+    annual: a/ESFire30_1985_2025/BA_{year}.shp           # annual perimeters (field area_ha / value1)
+    dated: b/ESFire30_2001_2025/burned_areas_{year}_MODIS.shp   # MODIS date-corrected (date, julian_day, area_ha)
+  corine:                  # CORINE Land Cover 2018 (100 m), fraction of each group per cell (GEE, area mean)
+    collection: COPERNICUS/CORINE/V20/100m/2018
+    band: landcover
+    year: 2018
+    groups:                # level-3 codes (all 44 assigned); dominant group = largest fraction of the cell
+      broadleaved: [311]
+      coniferous: [312]
+      mixed_forest: [313]
+      natural_grassland: [321]
+      heathland: [322]       # moors and heathland
+      sclerophyllous: [323]  # sclerophyllous vegetation
+      transitional: [324]    # transitional woodland-shrub
+      sparse_vegetation: [331, 332, 333]   # beaches/dunes, bare rock, sparsely vegetated areas
+      burnt_areas: [334]
+      agricultural: [211, 212, 213, 221, 222, 223, 231, 241, 242]   # arable, permanent crops, pastures, complex
+      agri_natural_mosaic: [243]   # agriculture with significant areas of natural vegetation
+      agroforestry: [244]          # agro-forestry areas (dehesas, montados)
+      artificial: [111, 112, 121, 122, 123, 124, 131, 132, 133, 141, 142]
+      water_wetland: [335, 411, 412, 421, 422, 423, 511, 512, 521, 522, 523]
+  strata:                  # analysis strata (results by vegetation) from the fire's dominant CORINE group
+    woodland: [broadleaved, coniferous, mixed_forest]
+    shrubland: [heathland, sclerophyllous, transitional]
+    grassland: [natural_grassland]   # negative control (cured grass = dead fuel)
+  static:
+    dem: CGIAR/SRTM90_V4    # 90 m (SRTM 30 m exceeds GEE user memory for the area mean)
+    era5land_monthly: ECMWF/ERA5_LAND/MONTHLY_AGGR   # superseded aridity (P/PET, PET overestimated): not used
+    aridity_years: [1991, 2020]
+    aridity:               # Global Aridity Index v3.1 (python -m physiofire.preprocess.aridity)
+      source: Global-AI_PET v3.1 annual aridity index (Zomer & Trabucco), 1970-2000, 30 arc-seconds
+      doi: 10.6084/m9.figshare.7504448.v7   # v3.1 (2025-07-17); v5 = v3, with the ET0 error corrected in v3.1
+      file: data/raw/global_ai/figshare_7504448_v7/Global-AI_ET0__annual_v3_1/ai_v31_yr.tif
+      scale: 0.0001
+      invalid_values: [0, 65535]
+      out_dir: data/interim/static
+  # Anomaly series used (from anomalies.compute) and standardisation: each cell's anomaly is divided by its own SD
+  # over the days before the epoch window (pre-ignition data only), so variables share units (SD).
+  # MAIN: median by day of year. SENSITIVITY: LOESS with the trend fitted only on data before day -60 (see
+  # epoch.loess_trend_end_day) on the deseasonalised series.
+  series: [median_doy_trail15, loess_trail15]
+  main_series: median_doy_trail15
+  loess_trend_end_day: -60 # LOESS trend estimated with data before this day; held at its last value afterwards
+  fpar_persist_days: 5     # SIF/APAR in the epoch: MODIS persistence (null = no persistence: reference run)
+  expected_sign: {sif_apar: -1, ndvi: -1, evi: -1, fwi: 1, aed: 1}   # direction of the pre-fire signal
+  effect_threshold_sd: 0.5 # lead time: earliest day from which the effect stays beyond this, in the expected sign
+  bootstrap_n: 2000        # fire-level bootstrap for confidence intervals
+  ci_level: 0.95
+  out_dir: data/processed/epoch
 
 # Generic QC points for the task 4 chain check (NOT fire locations). Rule fixed before looking at series.
 # IGBP classes from MCD12C1 (provisional: contrast with CORINE / WorldCover pending, IGBP can confuse
@@ -231,6 +305,11 @@ ignition:
   prior_lookback_days: 90
   review_early_days: 3       # marker only (manual review): ignition more than this many days before FIREDATE
   burn_date_dir: data/interim/gee/burndate   # {product}_burndate_*.nc (python -m physiofire.download.gee burn_dates)
+
+# Short list for the manual selection of the 2025 case (R/fire_shortlist.R -> docs/fire_shortlist_2025.md).
+# Vegetation from CORINE 2018 on the 0.05 deg grid (epoch.corine); MCD12C1 is no longer used for vegetation.
+shortlist:
+  min_area_ha: 2000
 
 # Selection criteria: to be fixed (and documented in docs/fire_selection_criteria.md)
 # BEFORE looking at SIF/APAR. null = pending decision.

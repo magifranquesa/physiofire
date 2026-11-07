@@ -98,6 +98,23 @@ def fetch(img: ee.Image, grid: Grid, retries: int = 6) -> dict[str, np.ndarray]:
     return {name: np.flipud(arr[name].astype("f8")) for name in arr.dtype.names}
 
 
+def fetch_tiled(img: ee.Image, grid: Grid, ny_tiles: int, nx_tiles: int) -> dict[str, np.ndarray]:
+    """fetch() in ny_tiles x nx_tiles sub-grids (cell edges preserved), for inputs whose native resolution makes a
+    single request exceed the Earth Engine reprojection limit. Returns the assembled south-to-north arrays."""
+    ys = np.linspace(0, grid.ny, ny_tiles + 1).round().astype(int)
+    xs = np.linspace(0, grid.nx, nx_tiles + 1).round().astype(int)
+    out: dict[str, np.ndarray] = {}
+    for i in range(ny_tiles):
+        for j in range(nx_tiles):
+            sub = Grid(grid.lon_min + xs[j] * grid.res, grid.lat_min + ys[i] * grid.res,
+                       grid.lon_min + xs[j + 1] * grid.res, grid.lat_min + ys[i + 1] * grid.res, grid.res)
+            a = fetch(img, sub)
+            for k, v in a.items():
+                out.setdefault(k, np.full((grid.ny, grid.nx), np.nan))[ys[i]:ys[i + 1], xs[j]:xs[j + 1]] = v
+            log.info("tile %d,%d fetched", i, j)
+    return out
+
+
 def block_mean(mean: np.ndarray, count: np.ndarray, factor: int) -> tuple[np.ndarray, np.ndarray]:
     """Count-weighted block average of a (..., ny, nx) array by an integer factor (fine -> coarse grid)."""
     m = np.where(count > 0, mean, 0.0)
@@ -624,20 +641,22 @@ def check_file(path: str, ranges: dict) -> None:
     log.info("%s: all %d time steps within plausible ranges", path, ds.sizes["time"])
 
 
-def run_burn_history(cfg: dict, y0: int, y1: int) -> None:
-    """Yearly MCD64A1 burn history per cell: burned fraction and first burn date (day of year).
+def run_burn_history(cfg: dict, y0: int, y1: int, product: str = "mcd64a1") -> None:
+    """Yearly burn history per cell from MCD64A1 or VNP64A1: burned fraction and first burn date (day of year).
     Used for the climatology/control masks (burned fraction above a threshold) and for the
-    'no burn in the previous 5 years' selection criterion."""
+    'no burn in the previous 5 years' selection criterion.
+    Output: burn_history_{grid}_{y0}_{y1}.nc (MCD64A1) or burn_history_vnp64a1_{grid}_{y0}_{y1}.nc."""
     gcfg = cfg["gee"]
+    pc = gcfg["burn_date_products"][product]
     fine = grid_from_config(cfg, gcfg["fetch_grid"])
     mx = int(gcfg["max_pixels"])
     tr = [fine.res, 0, fine.lon_min, 0, -fine.res, fine.lat_max]
     years = list(range(y0, y1 + 1))
     frac, first = [], []
     for y in years:
-        col = ee.ImageCollection(gcfg["burned"]["collection"]).filterDate(f"{y}-01-01", f"{y + 1}-01-01")
+        col = ee.ImageCollection(pc["collection"]).filterDate(f"{y}-01-01", f"{y + 1}-01-01")
         native = col.first().projection()
-        bd = col.select("BurnDate")
+        bd = col.select(pc["date_band"])
         burned = bd.max().gt(0).unmask(0).rename("burned").setDefaultProjection(native)
         doy = bd.map(lambda i: i.updateMask(i.gt(0))).min().rename("doy").setDefaultProjection(native)
         f = fetch(burned.reduceResolution(ee.Reducer.mean(), maxPixels=mx).reproject(crs="EPSG:4326", crsTransform=tr),
@@ -646,7 +665,7 @@ def run_burn_history(cfg: dict, y0: int, y1: int) -> None:
                   .unmask(0), fine)["doy"]
         frac.append(np.nan_to_num(f, nan=0.0))
         first.append(np.where(d > 0, d, np.nan))
-        log.info("burn history %d fetched", y)
+        log.info("burn history %s %d fetched", product, y)
     frac, first = np.stack(frac), np.stack(first)
     out_dir = REPO_ROOT / gcfg["out_dir"]
     for gname in cfg["grids"]:
@@ -665,10 +684,12 @@ def run_burn_history(cfg: dict, y0: int, y1: int) -> None:
         ds = xr.Dataset({"burned_fraction": (("year", "lat", "lon"), fr.astype("f4")),
                          "first_burn_doy": (("year", "lat", "lon"), fd.astype("f4"))},
                         coords={"year": years, "lat": grid.lat, "lon": grid.lon})
-        ds["burned_fraction"].attrs = {"long_name": "fraction of cell burned during the year (MCD64A1)"}
-        ds["first_burn_doy"].attrs = {"long_name": "earliest MCD64A1 burn day of year in the cell (NaN = none)"}
-        ds.attrs = {"source": gcfg["burned"]["collection"], "resolution_deg": grid.res}
-        out = out_dir / f"burn_history_{gname}_{y0}_{y1}.nc"
+        lab = product.upper()
+        ds["burned_fraction"].attrs = {"long_name": f"fraction of cell burned during the year ({lab})"}
+        ds["first_burn_doy"].attrs = {"long_name": f"earliest {lab} burn day of year in the cell (NaN = none)"}
+        ds.attrs = {"source": pc["collection"], "resolution_deg": grid.res}
+        tag = "" if product == "mcd64a1" else f"{product}_"
+        out = out_dir / f"burn_history_{tag}{gname}_{y0}_{y1}.nc"
         ds.to_netcdf(out)
         log.info("wrote %s", out.relative_to(REPO_ROOT))
 
@@ -712,12 +733,91 @@ def run_burn_dates(cfg: dict, product: str, start: dt.date, end: dt.date) -> Non
     log.info("wrote %s", f.relative_to(REPO_ROOT))
 
 
+def run_static(cfg: dict) -> None:
+    """Static fields for matching control cells (epoch.controls): mean elevation (SRTM, area mean) and a
+    climatological aridity index P / PET from ERA5-Land monthly sums over epoch.static.aridity_years (bilinear from
+    0.1 deg; ERA5-Land potential evaporation is negative by convention, its absolute value is used).
+    PROVISIONAL aridity: ERA5-Land PET overestimates; only used to compare nearby cells.
+    Output: data/interim/gee/static_{grid}.nc (elevation_m, aridity_index)."""
+    gcfg, st = cfg["gee"], cfg["epoch"]["static"]
+    fine = grid_from_config(cfg, gcfg["fetch_grid"])
+    mx = int(gcfg["max_pixels"])
+    dem = ee.Image(st["dem"]).select("elevation").rename("elev")
+    e = fetch(_to_grid(dem, fine, mx), fine)
+    y0, y1 = (int(v) for v in st["aridity_years"])
+    era = ee.ImageCollection(st["era5land_monthly"]).filterDate(f"{y0}-01-01", f"{y1 + 1}-01-01")
+    nyr = y1 - y0 + 1
+    p = era.select("total_precipitation_sum").sum().divide(nyr)
+    pet = era.select("potential_evaporation_sum").sum().divide(nyr).abs()
+    ai = p.divide(pet).rename("ai").setDefaultProjection(era.first().projection())
+    a = fetch(_reproject_bilinear(ai, fine).unmask(NODATA), fine)["ai"]
+    a[a <= NODATA + 1] = np.nan
+    out_dir = REPO_ROOT / gcfg["out_dir"]
+    for gname in cfg["grids"]:
+        grid = grid_from_config(cfg, gname)
+        k = int(round(grid.res / fine.res))
+        em, ec = block_mean(e["elev_mean"], e["elev_count"], k) if k > 1 else (e["elev_mean"], e["elev_count"])
+        am = a if k == 1 else np.nanmean(a.reshape(grid.ny, k, grid.nx, k), axis=(1, 3))
+        ds = xr.Dataset({"elevation_m": (("lat", "lon"), np.where(ec > 0, em, np.nan).astype("f4")),
+                         "aridity_index": (("lat", "lon"), am.astype("f4"))},
+                        coords={"lat": grid.lat, "lon": grid.lon})
+        ds["elevation_m"].attrs = {"long_name": "mean elevation", "source": st["dem"], "units": "m"}
+        ds["aridity_index"].attrs = {"long_name": f"P / |PET| (ERA5-Land monthly sums {y0}-{y1}), PROVISIONAL",
+                                     "source": st["era5land_monthly"]}
+        f = out_dir / f"static_{gname}.nc"
+        ds.to_netcdf(f)
+        log.info("wrote %s", f.relative_to(REPO_ROOT))
+
+
+def run_corine(cfg: dict) -> None:
+    """CORINE Land Cover fraction of each group of epoch.corine.groups per cell (area mean of the 100 m class
+    indicator on the fetch grid; block means for coarser grids). Fractions are of the cell's CORINE-mapped area.
+    Output: data/interim/gee/corine_{year}_{grid}.nc (fraction(group, lat, lon), mapped_count)."""
+    gcfg, cc = cfg["gee"], cfg["epoch"]["corine"]
+    fine = grid_from_config(cfg, gcfg["fetch_grid"])
+    mx = int(gcfg["max_pixels"])
+    lc = ee.Image(cc["collection"]).select(cc["band"])
+    names = list(cc["groups"])
+    bands = [lc.remap(list(map(int, cc["groups"][g])), [1] * len(cc["groups"][g]), 0).rename(g) for g in names]
+    img = ee.Image(bands).updateMask(lc.mask()).toFloat().setDefaultProjection(lc.projection())
+    a = fetch_tiled(_to_grid(img, fine, mx).unmask(NODATA), fine, 4, 4)   # 100 m input: one request is too large
+    out_dir = REPO_ROOT / gcfg["out_dir"]
+    for gname in cfg["grids"]:
+        grid = grid_from_config(cfg, gname)
+        k = int(round(grid.res / fine.res))
+        fr, cnt = [], None
+        for g in names:
+            m, c = a[f"{g}_mean"], a[f"{g}_count"]
+            c = np.where(m <= NODATA + 1, 0.0, c)
+            m = np.where(c > 0, m, np.nan)
+            if k > 1:
+                m, c = block_mean(m, c, k)
+            fr.append(m)
+            cnt = c
+        tot = np.nansum(np.stack(fr), axis=0)
+        ds = xr.Dataset({"fraction": (("group", "lat", "lon"), np.stack(fr).astype("f4")),
+                         "mapped_count": (("lat", "lon"), cnt.astype("f4"))},
+                        coords={"group": names, "lat": grid.lat, "lon": grid.lon})
+        ds["fraction"].attrs = {"long_name": "fraction of the CORINE-mapped area of the cell in each group",
+                                "units": "1", "groups": "; ".join(f"{g}: {cc['groups'][g]}" for g in names)}
+        ds["mapped_count"].attrs = {"long_name": "number of 100 m CORINE pixels (area-weighted) in the cell"}
+        ds.attrs = {"source": cc["collection"], "year": int(cc["year"]), "resolution_deg": grid.res,
+                    "aggregated_in": "Google Earth Engine (reduceResolution mean)", "Conventions": "CF-1.8"}
+        ok = np.isfinite(tot) & (cnt > 0)
+        log.info("CORINE %s: %d cells, group fractions sum to 1 within 1e-3 in %.1f %%", gname, int(ok.sum()),
+                 100 * np.mean(np.abs(tot[ok] - 1) < 1e-3))
+        f = out_dir / f"corine_{int(cc['year'])}_{gname}.nc"
+        ds.to_netcdf(f, encoding={"fraction": {"zlib": True, "complevel": 4}})
+        log.info("wrote %s", f.relative_to(REPO_ROOT))
+
+
 def main(argv=None) -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("product", choices=["fpar", "fpar_viirs", "nbar", "mod09ga", "myd09ga", "landcover", "mask",
                                        "shortwave", "shortwave_monthly_1deg", "burned", "burn_history", "check",
-                                       "series", "burn_dates"])
-    p.add_argument("--burn-product", choices=["mcd64a1", "vnp64a1"], help="for 'burn_dates'")
+                                       "series", "burn_dates", "static", "corine"])
+    p.add_argument("--burn-product", choices=["mcd64a1", "vnp64a1"], default="mcd64a1",
+                   help="for 'burn_dates' and 'burn_history'")
     p.add_argument("--file", help="for 'check': NetCDF written by this module to re-check against plausible ranges")
     p.add_argument("--products", nargs="+", default=SERIES_PRODUCTS, help="for 'series': products in priority order")
     p.add_argument("--workers", type=int, default=8, help="for 'series': simultaneous requests")
@@ -744,11 +844,15 @@ def main(argv=None) -> None:
             log.error("STOPPED by plausibility check: %s", e)
             raise
         log.info("SERIES FINISHED; total throttling hits: %d", RATE_LIMIT_HITS["n"])
+    elif args.product == "static":
+        run_static(cfg)
+    elif args.product == "corine":
+        run_corine(cfg)
     elif args.product == "burn_dates":
         run_burn_dates(cfg, args.burn_product, args.start, args.end)
     elif args.product == "burn_history":
         y0, y1 = cfg["gee"]["burn_history_years"]
-        run_burn_history(cfg, int(y0), int(y1))
+        run_burn_history(cfg, int(y0), int(y1), args.burn_product)
     elif args.product == "landcover":
         run_landcover(cfg, args.year)
     elif args.product == "shortwave":

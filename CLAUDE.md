@@ -55,7 +55,7 @@ Responder a una pregunta para decidir si seguir:
 
 ## Incendios
 
-- **España:** cartografía anual de incendios de Ochoa et al. El investigador es colaborador y los datos están disponibles en el grupo. Confirmar que incluye 2025.
+- **España:** cartografía anual de incendios de Ochoa et al. (ESFire30, publicada en Zenodo: 10.5281/zenodo.20257001). Incluye 2025 y, para 2001–2025, fechas corregidas con MODIS. Solo cubre España.
 - **Alternativa y complemento: perímetros de EFFIS.** Para grandes incendios son muy precisos, cubren España y Portugal con el mismo método e incluyen fecha. Si la cartografía de Ochoa no llega a 2025, usar EFFIS. Aunque llegue, EFFIS sirve para contrastar perímetros y fechas. Ojo: la fecha de EFFIS puede ser la de detección y los perímetros de incendios cercanos pueden aparecer fusionados; contrastar con FIRMS.
 - **Portugal:** cartografía de incendios disponible (fuente concreta a confirmar con el investigador).
 - **Fecha de inicio:** imprescindible para el análisis. Si una cartografía no la incluye, asignarla cruzando cada perímetro con la primera detección de FIRMS VIIRS y, si es posible, con la EGIF (España) o el ICNF (Portugal) **(verificar)**.
@@ -80,6 +80,8 @@ Responder a una pregunta para decidir si seguir:
 
 ## Base científica: Tang et al. (2026)
 
+> **Criterio general (decidido el 7 de noviembre de 2026).** Tang et al. (2026) es la **base conceptual** (descomposición de la SIF y SIF/APAR como indicador fisiológico), **no un método a replicar**. Cada decisión se toma por lo que mejor responde a la pregunta en la Península Ibérica, no por comparabilidad con Tang. Lo que solo servía para comparar con Tang va al backlog con prioridad baja. Las diferencias con Tang se documentan en la discusión, sin intentar reducirlas.
+
 Tang, Z., Miralles, D. G., Guo, Z. & Maes, W. H. (2026). *Fast response of satellite fluorescence-derived plant physiology to drought stress.* Nature Communications 17:2886. https://doi.org/10.1038/s41467-026-70076-0
 
 Código y datos del artículo: https://doi.org/10.5281/zenodo.18327559 (un zip de 71 MB, licencia CC BY 4.0; citar si se reutiliza código). Revisarlo es útil pero no prioritario.
@@ -91,37 +93,40 @@ Resultados clave:
 - La fisiología se alinea con el VPD; la estructura, con la humedad del suelo.
 - Respuestas más rápidas en zonas húmedas, más lentas en zonas áridas. Esto es una limitación para la Península.
 
-Pasos del método que se usan en la prueba de concepto:
+Pasos de Tang que sirvieron de punto de partida (la versión vigente está en `docs/methods_draft_RSE.md` y `config/config.yaml`):
 1. SIF diario de TROPOMI (TROPOSIF, 743 nm, corregido por duración del día), desde el 1 de mayo de 2018.
 2. Excluir datos con calidad < 0,5 y fracción de nubes > 50 %. Máscaras de nieve, agua y suelo desnudo. El artículo usa SWE de GlobSnow para la nieve; en la Península probablemente baste con la nieve de ERA5-Land (decisión pendiente).
-3. PAR de CERES SYN1deg Ed4.1 (suma de PAR directa y difusa, cielo real), diario, 1°, interpolado a la rejilla de trabajo.
+3. PAR de CERES SYN1deg Ed4.1 en Tang. **Aquí:** PAR = 0,48 × radiación solar descendente de ERA5-Land (serie homogénea y poca latencia); CERES Ed4B, solo como prueba de sensibilidad.
 4. fPAR de MODIS MCD15A3H (4 días, 500 m), remuestreado e interpolado linealmente a diario.
-5. SIF/APAR = SIF / (PAR × fPAR); descartar valores fuera de los percentiles 1–99.
-6. Anomalías: tendencia con LOESS (ventana del 40 % del periodo) y resta del ciclo estacional medio diario. Suavizado de 15 días y 3 × 3 píxeles. La climatología es corta (desde 2018): documentarlo y probar una alternativa, por ejemplo anomalías respecto a la mediana del periodo.
+5. SIF/APAR = SIF / (PAR × fPAR). Tang descarta valores fuera de los percentiles 1–99; aquí, filtro de picos por celda (ver "Reglas del análisis de época").
+6. Anomalías: Tang usa tendencia LOESS más ciclo estacional medio y suavizado centrado de 15 días y 3 × 3. **Aquí:** mediana por día del año (±15 días) como método principal del análisis de época, con medias hacia atrás de 15 días; LOESS (tendencia ajustada solo antes del día −60, sobre la serie desestacionalizada) como prueba de sensibilidad.
 
 ## Escala
 
-- **Base:** 0,25°, como el artículo. Un píxel mide unos 25 × 25 km, mucho más que la mayoría de incendios.
-- **Alternativa:** rejillado más fino de TROPOMI (en torno a 0,05°), con más ruido.
-- Probar las dos con los mismos incendios.
+- **Principal (decidido el 7 de noviembre de 2026): 0,05°** para toda la prueba de concepto. Con los incendios de 2025 es la única escala con celdas quemadas y controles suficientes.
+- **0,25°:** al backlog, como prueba de sensibilidad con un diseño de controles propio. Casi todas las celdas de 0,25° del noroeste tienen algo quemado desde 2017; no ampliar el anillo de controles, porque perderían comparabilidad climática.
 
 ## Datos
 
 | Variable | Fuente | Notas |
 | --- | --- | --- |
-| Incendios (España) | Cartografía anual de Ochoa et al. (datos del grupo) | Confirmar que incluye 2025 y la fecha de inicio |
+| Incendios (España) | ESFire30 (Ochoa et al.; Landsat 30 m, 1985–2025; Zenodo 10.5281/zenodo.20257001, CC BY 4.0) | Solo España. Incluye 2025 y una versión con fechas corregidas con MODIS (2001–2025). Se usa para el criterio "sin quemar" de los controles |
 | Incendios (España y Portugal) | Perímetros de EFFIS | Alternativa si Ochoa no llega a 2025; contraste de perímetros y fechas |
 | Incendios (Portugal) | Cartografía a confirmar con el investigador | Fecha de inicio a confirmar |
 | Fecha de inicio | NASA FIRMS (VIIRS); EGIF (MITECO); ICNF | Acceso a EGIF e ICNF **(verificar)** |
 | SIF | TROPOSIF (TROPOMI): https://data-portal.s5p-pal.com/products/troposif.html | L2B diario global (~400 MB/día, sin cuenta), hasta noviembre de 2026; descargar, recortar y borrar con script reanudable. Detalles en docs/data_sources.md |
-| PAR | CERES SYN1deg Ed4B ("Ed4.2" en la herramienta de pedidos; Ed4.1 ya no se ofrece) o PAR en superficie de ERA5 | CERES llega al 31 de agosto de 2026 y cambia de entradas en abril de 2022: comparar con ERA5 y comprobar el salto. Detalles en docs/data_sources.md |
+| PAR | 0,48 × radiación solar descendente de ERA5-Land (principal) | CERES SYN1deg Ed4B solo como prueba de sensibilidad (llega al 31 de agosto de 2026 y cambia de entradas en abril de 2022). Detalles en docs/data_sources.md |
 | fPAR | MODIS MCD15A3H v061 (LP DAAC) | Fin de MODIS; VIIRS VNP15A2H como alternativa **(verificar)** |
-| NDVI, EVI | MODIS MCD43C4 v061 (diario, 0,05°) | Fórmula de EVI en el artículo |
+| NDVI, EVI | MOD09GA/MYD09GA v061 diario (principal); NBAR de MCD43A4 como sensibilidad | MCD43C4 no está en GEE |
 | Meteorología | ERA5-Land, AEMET (grupo), IPMA | Ver "Meteorología y FWI" |
 | FWI de referencia | EFFIS / Copernicus EMS en el EWDS (no en el CDS) | 0,25°, calculado con ERA5 a las 12 hora local; versión y acceso con la cuenta del CDS **(verificar)** |
-| Cobertura del suelo | CORINE o ESA WorldCover; MODIS MCD12C1 como en el artículo | Para estratificar y emparejar controles |
+| Cobertura del suelo | CORINE Land Cover 2018 (GEE, 100 m) agregado a 0,05° | Para estratificar y emparejar controles. MCD12C1 deja de usarse (casi no asigna matorral en los incendios de 2025) |
+| Aridez | Global Aridity Index v3.1 (figshare 10.6084/m9.figshare.7504448.v7) | P/ET0 de 1970–2000, 30″. La v3 (figshare v5) tenía un error en la ET0 |
+| Altitud | SRTM 90 m (`CGIAR/SRTM90_V4`) | Media por celda |
 
 Cuentas necesarias (probablemente): NASA Earthdata, Copernicus CDS y quizá el portal S5P-PAL.
+
+Control de calidad de los datos: `docs/supplementary_qc.md` (irá como material suplementario). Pruebas de sensibilidad: `docs/backlog.md` y tabla 2 del borrador de métodos.
 
 ## Plan de trabajo
 
@@ -212,19 +217,21 @@ physiofire/
 
 Stack: Python 3.11 (`environment.yml`) con xarray, dask, rioxarray, zarr, netCDF4, pandas, geopandas, scipy, statsmodels, scikit-learn, matplotlib (solo vistas rápidas), cdsapi, earthaccess y earthengine-api; R 4.6 (`renv.lock`) con yaml, sf, terra, dplyr, tidyr, readr, ggplot2 y patchwork. Añadir una implementación del FWI canadiense solo tras verificar cuál usar.
 
+## Decisiones tomadas (7 de noviembre de 2026)
+
+- **Caso 2025:** selección manual de 10–15 incendios de la lista corta de EFFIS > 2000 ha (`docs/fire_shortlist_2025.md`), guardada con fecha antes de analizar. Las reglas automáticas, para la prueba completa (backlog).
+- **Fecha de ignición:** la más temprana entre EFFIS, VIIRS, MCD64A1 y VNP64A1 (el error peligroso es una fecha tardía).
+- **Escala:** 0,05°. **Anomalías:** mediana por día del año; LOESS como sensibilidad.
+- **Umbrales** (en `config.yaml`, sección `epoch`): celda quemada ≥ 25 %; controles 3–5 por incendio, a 10–50 km, 0 % quemado desde 2017 (EFFIS, MCD64A1, VNP64A1 y ESFire30), mismo grupo dominante de CORINE, aridez ±0,1 y altitud ±200 m; antelación = primer día desde el que el efecto se mantiene ≥ 0,5 DE hasta el día −1.
+- **Vegetación:** CORINE 2018. **Aridez:** Global-AI v3.1. **PAR:** ERA5-Land.
+- **Nieve:** sin máscara específica en el caso 2025 (ventanas de junio a agosto); GlobSnow, al backlog.
+
 ## Decisiones pendientes con el investigador
 
 - Fuente de la cartografía de Portugal, o EFFIS para ambos países.
-- Si la cartografía de Ochoa incluye 2025.
-- Si las cartografías incluyen la fecha de inicio de cada incendio.
 - Fuente meteorológica del análisis principal (ERA5-Land, o AEMET + IPMA).
 - Si se usa la AED ya calculada por el grupo o se calcula con FAO-56 Penman-Monteith.
-- Superficie mínima y resto de umbrales de selección.
-- Máscara de nieve (ERA5-Land o GlobSnow).
-- Fuente definitiva de PAR: CERES Ed4B o ERA5-Land (serie homogénea y poca latencia), según la prueba del salto de abril de 2022. Mientras tanto, PAR provisional = 0,48 × radiación solar descendente de ERA5-Land.
-- Estratificación por vegetación: contrastar MCD12C1 (IGBP) con CORINE o ESA WorldCover antes de usarlo, porque las clases IGBP pueden confundir matorral y arbolado mediterráneos.
-- Con la serie completa: repetir por año la comparación Aqua − Terra del NDVI diario (MYD09GA − MOD09GA) para detectar efectos de la deriva orbital.
-- fPAR de MCD15A3H: valorar añadir el estado de nubes de MOD09 (bits 3–4 de `FparLai_QC`), porque el filtro de `FparExtra_QC` reduce pero no elimina las caídas en arbolado.
+- Discriminación dentro de las clases de FWI: estadístico (p. ej., AUC por clase) y umbrales de clase de EFFIS.
 
 ## Contexto adicional
 

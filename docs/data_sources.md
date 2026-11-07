@@ -383,16 +383,63 @@ MODIS tiene además el estado de nubes heredado de MOD09 en `FparLai_QC` (bits 3
 - **Diferencia con EFFIS por fuente** (mediana, perímetros de ≥ 500 ha): VIIRS 0 días, MCD64A1 −1 día, VNP64A1 0 días.
 - **Marcados de ≥ 500 ha:** los 7 lo están por entre 1 y 11 detecciones VIIRS entre 90 y 30 días antes, frente a cientos o miles dentro del incendio. Ninguno por MCD64A1 ni VNP64A1.
 
+## Campos estáticos para los controles (7 de noviembre de 2026)
+
+**Script:** `python -m physiofire.download.gee static`. Escribe `data/interim/gee/static_{base,fine}.nc`.
+- **Altitud media:** `CGIAR/SRTM90_V4`, banda `elevation`, media por área. SRTM a 30 m (`USGS/SRTMGL1_003`) agota la memoria de usuario de GEE al agregar a 0,05°.
+- **Índice de aridez:** P / |PET| con `ECMWF/ERA5_LAND/MONTHLY_AGGR` (`total_precipitation_sum` y `potential_evaporation_sum`, esta negativa por convención), sumas medias anuales de 1991–2020, interpolación bilineal desde 0,1°.
+  - **PROVISIONAL:** la PET de ERA5-Land está sobrestimada, así que los valores son bajos (Madrid ≈ 0,22, Galicia ≈ 0,95, sureste ≈ 0,16).
+  - Solo se usa para comparar celdas cercanas; cuando haya AED se puede sustituir.
+  - **Sustituido** el mismo día por el Global Aridity Index v3.1 (ver abajo). El campo sigue en `static_*.nc`, pero no se usa.
+
+## Fuentes nuevas para emparejar controles (7 de noviembre de 2026)
+
+**Índice de aridez: Global Aridity Index v3.1** ✅
+- figshare 7504448. La DOI que se pidió (v5, 10.6084/m9.figshare.7504448.v5) es la **versión 3**. La **v7 (versión 3.1, 17 de julio de 2025)** corrige un error de la v3: en el término de Stefan-Boltzmann se usaba la temperatura en °C en lugar de K, lo que sobrestimaba la ET0 y daba un índice demasiado árido. El readme recomienda migrar a la 3.1. **Se usa la v3.1.**
+- Archivo: `Global-AI_ET0__annual_v3_1.zip` (646 MB), de él solo `ai_v31_yr.tif`. GeoTIFF uint16 de 30″ (rejilla global con origen −180, 90), valores × 10 000 (multiplicar por 0,0001), 1970–2000. El mar vale 0 en esta zona.
+- En `data/raw/global_ai/figshare_7504448_v7/`. Agregado con `python -m physiofire.preprocess.aridity` a `data/interim/static/aridity_gai_{base,fine}.nc` (media de 6 × 6 píxeles por celda de 0,05°, sin remuestreo).
+- Valores: Almería 0,22, Madrid 0,34, Santiago 1,87; percentiles 5–95 de la Península 0,26–1,47. Frente al índice provisional de ERA5-Land: r = 0,82 y 1,63 veces mayor (mediana).
+
+**CORINE Land Cover 2018** ✅
+- GEE: `COPERNICUS/CORINE/V20/100m/2018`, banda `landcover`, códigos de nivel 3 (111–523), 100 m en EPSG:3035. Cubre España y Portugal.
+- `python -m physiofire.download.gee corine`: fracción de cada grupo de `epoch.corine.groups` por celda (media por área del indicador de clase). Hay que pedirlo en 16 teselas, porque en una sola petición supera el límite de reproyección de GEE (13 726 × 11 884 píxeles).
+- Grupos: los siete pedidos (311, 312, 313, 321, 322, 323, 324) más cultivos y prados (211–242), mosaico agrícola con vegetación natural (243), agroforestal, dehesas y montados (244), vegetación escasa (331–333), zonas quemadas (334), artificial y agua. El grupo agrícola se separó en tres porque, con uno solo, dominaba en 20 de los 53 incendios de la lista corta y mezclaba cultivos con mosaicos y dehesas.
+- Las fracciones suman 1 (± 0,001) en el 99,9 % de las 34 399 celdas de 0,05° con datos. Comprobado que R (terra) y Python leen las capas en el mismo orden.
+
+**ESFire30 (cartografía de Ochoa et al.)** ✅
+- Zenodo 20257001 (DOI 10.5281/zenodo.20257001, 26 de mayo de 2026, CC BY 4.0). Autores: Clara Ochoa, Amin Khairoun, José Antonio Rodado Coello y Emilio Chuvieco. Landsat 30 m, algoritmo BAMT.
+- Dos productos: `ESFire30_1985_2025.zip` (perímetros anuales `BA_{año}.shp`, campo `area_ha` o `value1`) y `ESFire30_2001_2025.zip` (`burned_areas_{año}_MODIS.shp`, con `date`, `julian_day` y `area_ha`: fechas corregidas con MODIS). 33 MB en total, en `data/raw/esfire30/zenodo_20257001/`. El CRS cambia según el año (WGS84 o ETRS89 UTM 30N).
+- **Solo España:** coincide con los 33 incendios españoles de la lista corta y con 1 de los 20 portugueses.
+- **Incluye 2025** (2428 polígonos). Resuelve la pregunta pendiente de CLAUDE.md sobre si la cartografía de Ochoa llega a 2025.
+- Uso actual: criterio "sin quemar desde 2017" de los controles. La versión fechada puede servir para validar la fecha de ignición en España (backlog 22). En Zenodo hay además "ESFire30 Causes" (18449006, 93 MB) y "Validation ESFire30" (18646713, 1 GB); no se han descargado.
+
+**Historial de quemas de VNP64A1** ✅
+- `python -m physiofire.download.gee burn_history --burn-product vnp64a1` escribe `burn_history_vnp64a1_{grid}_2013_2025.nc`, con las mismas variables que el de MCD64A1.
+
+## Serie diaria MOD09GA/MYD09GA completada (7 de noviembre de 2026)
+
+- **Orden de descarga:** MOD09GA 2025–2026, MYD09GA 2018–2026 y MOD09GA 2018–2024 de nuevo con el filtro de negativos. Ningún aviso de límite de peticiones.
+- **Imágenes rechazadas:** solo una en toda la serie (MOD09GA, 29 de marzo de 2025).
+- **Comprobación de los nuevos MOD09GA 2018–2024 frente a la copia:**
+  - Mismos pasos de tiempo y `neg` presente.
+  - Ninguna reflectancia negativa.
+  - Cambia el 0,5–0,8 % de las celdas de 0,05° y se pierden de 35 a 84 celdas-día por año.
+- **Copia de seguridad:** borrada tras la comprobación.
+
 ## Pendiente para la serie completa
 
 - Repetir por año la comparación Aqua − Terra del NDVI diario (MYD09GA − MOD09GA), para detectar efectos de la deriva orbital. En la muestra de 2025 la diferencia mediana es −0,001.
 
-## Diferencias con Tang et al. (2026) que hay que documentar
+## Diferencias con Tang et al. (2026), para la discusión
 
-- CERES Ed4B (Ed4.2) en lugar de Ed4.1/Ed4A, con el cambio de entradas de abril de 2022.
-- TROPOSIF L2B (qa > 0,5) en lugar de qa ≥ 0,5, si no se usa el L2.
-- VPD y meteorología de ERA5-Land en lugar de AIRS.
-- Nieve de ERA5-Land en lugar de GlobSnow (decisión pendiente).
-- NBAR de MCD43A4 agregado en GEE en lugar de MCD43C4; LAI y fPAR agregados en GEE, como en el artículo.
-- AED en lugar de VPD como variable atmosférica.
-- PAR provisional a partir de ERA5-Land hasta la prueba con CERES.
+Tang es la base conceptual, no un método a replicar (CLAUDE.md, 7 de noviembre de 2026). Estas diferencias se documentan, no se intentan reducir.
+
+- PAR de ERA5-Land (0,48 × radiación de onda corta) en lugar de CERES SYN1deg; CERES Ed4B, como sensibilidad.
+- TROPOSIF L2B (qa > 0,5) en lugar de qa ≥ 0,5.
+- AED (FAO-56, ERA5-Land) en lugar de VPD como variable atmosférica.
+- Sin máscara de nieve en el caso 2025 (ventanas de verano), en lugar de GlobSnow.
+- NDVI/EVI diario de MOD09GA/MYD09GA en lugar de NBAR de MCD43C4.
+- Anomalías respecto a la mediana por día del año, con medias hacia atrás, en lugar de LOESS más ciclo medio y suavizado centrado.
+- Filtro de picos por celda en lugar del filtro de percentiles 1–99 global.
+- Rejilla de 0,05° en lugar de 0,25°.
+- Vegetación de CORINE 2018 en lugar de MCD12C1.

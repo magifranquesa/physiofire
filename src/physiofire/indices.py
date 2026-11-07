@@ -198,8 +198,8 @@ def build(cfg: dict, start: dt.date, end: dt.date) -> None:
                  "ndvi": "1", "evi": "1", "nirv": "1"}
         for v, u in units.items():
             ds[v].attrs["units"] = u
-        ds["par"].attrs.update(long_name="PAR (PROVISIONAL: par_fraction x ERA5-Land downward shortwave)",
-                               par_fraction=float(pcfg["par_fraction"]), provisional=1)
+        ds["par"].attrs.update(long_name="PAR = par_fraction x ERA5-Land downward shortwave",
+                               par_fraction=float(pcfg["par_fraction"]), provisional=int(bool(pcfg["provisional"])))
         ds["fpar"].attrs.update(long_name="daily fPAR, centred interpolation of composites (DESCRIPTIVE ONLY; "
                                           "epoch analysis rebuilds it with composites_to_daily_cut)")
         ds["sif_apar"].attrs.update(long_name="SIF / (PAR x fPAR), unfiltered")
