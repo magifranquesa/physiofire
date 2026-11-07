@@ -130,7 +130,7 @@ def test_run_end_to_end(tmp_path):
     cells.to_csv(tmp_path / "cells.csv", index=False)
     df = epoch.run(CFG, "base", str(tmp_path / "fires.csv"), str(tmp_path / "cells.csv"), inputs,
                    str(tmp_path / "anom.csv"))
-    assert set(df.variable) == {"sif_apar", "ndvi", "evi"}
+    assert set(df.variable) == {"sif_apar", "sif_apar_nopersist", "ndvi", "evi"}
     late = df[(df.day_rel >= -5) & (df.series == ECFG["series"][0]) & (df.variable == "sif_apar")]
     b = late[late.group == "burned"].z.mean()
     c = late[late.group == "control"].z.mean()
@@ -151,3 +151,74 @@ def test_loess_trend_end_limits_signal_absorption():
     assert abs(early_cut) < 0.3, early_cut
     assert abs(early_cut) <= abs(early_full) + 0.05, (early_cut, early_full)
     assert np.nanmean(cut[-7:, :NB]) <= np.nanmean(full[-7:, :NB]) + 0.05
+
+
+def test_combine_platforms():
+    a = np.array([0.5, np.nan, 0.4, np.nan])
+    b = np.array([0.7, 0.6, np.nan, np.nan])
+    np.testing.assert_allclose(epoch.combine_platforms(a, b), [0.6, 0.6, 0.4, np.nan])
+
+
+def test_run_real_style_inputs(tmp_path):
+    """Terra + Aqua inputs, NBAR sensitivity, FWI on a coarser grid (nearest containing cell), excluded fires
+    skipped, NBAR masked from day -8 and no spike filter on FWI."""
+    inputs, fires, cells = synthetic_inputs()
+    sr = inputs.pop("sr")
+    inputs["sr_terra"] = sr
+    inputs["sr_aqua"] = sr.copy(deep=True)
+    inputs["nbar"] = sr.copy(deep=True)
+    lat, lon = inputs["sif"]["lat"].values, inputs["sif"]["lon"].values
+    # FWI on a coarser grid (half the resolution): each value = 100 * coarse column index
+    clat = np.array([lat.mean()])
+    clon = lon[::2] + (lon[1] - lon[0]) / 2
+    days = inputs["sif"].time.values
+    fwi = np.broadcast_to(100.0 * np.arange(clon.size)[None, None, :], (days.size, 1, clon.size)).copy()
+    fwi += np.random.default_rng(1).normal(0, 1, fwi.shape)
+    fwi[days.astype("datetime64[D]") == IGN - np.timedelta64(30, "D")] += 50   # one genuine extreme day
+    inputs["fwi"] = xr.Dataset({"fwi": (("time", "lat", "lon"), fwi)},
+                               coords={"time": days, "lat": clat, "lon": clon})
+    fires["exclude"] = [True] + [False] * (len(fires) - 1)
+    fires.to_csv(tmp_path / "fires.csv", index=False)
+    cells.to_csv(tmp_path / "cells.csv", index=False)
+    cfg = dict(CFG, epoch=dict(ECFG))
+    df = epoch.run(cfg, "base", str(tmp_path / "fires.csv"), str(tmp_path / "cells.csv"), inputs,
+                   str(tmp_path / "anom.csv"))
+    assert "f0" not in set(df.fire_id)
+    assert {"ndvi_terra", "ndvi_aqua", "ndvi_nbar", "evi_nbar", "fwi"} <= set(df.variable)
+    # identical platforms: combined index equals each platform
+    s0 = ECFG["series"][0]
+    a = df[(df.variable == "ndvi") & (df.series == s0)].z.to_numpy()
+    b = df[(df.variable == "ndvi_terra") & (df.series == s0)].z.to_numpy()
+    np.testing.assert_allclose(a, b, equal_nan=True)
+    # NBAR: nothing on days -8 .. -1
+    nb = df[(df.variable == "ndvi_nbar") & (df.day_rel >= -8)]
+    assert nb.z.isna().all()
+    nd = df[(df.variable == "ndvi") & (df.day_rel >= -8)]
+    assert nd.z.notna().any()
+
+
+def test_spike_filter_not_applied_to_meteorology():
+    x = _synthetic(signal=0.0)
+    x[DAYS == IGN - np.timedelta64(30, "D"), :] += 40.0      # isolated extreme day in every cell
+    e = dict(ECFG, series=["median_doy_trail15"], spike_filter_variables=["sif_apar"])
+    out = epoch.fire_series({"fwi": x, "sif_apar": x}, DAYS, IGN, ACFG, e)
+    d = int((IGN - np.timedelta64(30, "D") - (IGN - np.timedelta64(60, "D"))).astype(int))
+    # FWI keeps the extreme day (the trailing mean jumps); SIF/APAR has it removed as an isolated spike
+    assert np.nanmean(out["fwi"]["median_doy_trail15"][d]) > np.nanmean(out["sif_apar"]["median_doy_trail15"][d]) + 1
+
+
+def test_extract_coarse_grid_takes_containing_cell():
+    # reference 0.05 deg cells (centres x.025, x.075) inside native ERA5-Land 0.1 deg cells (centres at x.0, x.1)
+    rlat = np.round(40.0 + 0.05 * np.arange(4) + 0.025, 3)
+    rlon = np.round(-1.0 + 0.05 * np.arange(6) + 0.025, 3)
+    t = np.array(["2025-01-01"], dtype="datetime64[ns]")
+    ref = xr.DataArray(np.zeros((1, 4, 6)), coords={"time": t, "lat": rlat, "lon": rlon}, dims=("time", "lat", "lon"))
+    clat = np.round(np.arange(39.9, 40.35, 0.1), 3)
+    clon = np.round(np.arange(-1.1, -0.65, 0.1), 3)
+    val = 1000 * clat[:, None] + clon[None, :]
+    coarse = xr.DataArray(val[None], coords={"time": t, "lat": clat, "lon": clon}, dims=("time", "lat", "lon"))
+    iy, ix = np.array([0, 1, 2, 3]), np.array([0, 1, 4, 5])
+    got = epoch._extract(coarse, ref, iy, ix, None)[0]
+    want_lat = np.round(np.round(rlat[iy] / 0.1) * 0.1, 3)
+    want_lon = np.round(np.round(rlon[ix] / 0.1) * 0.1, 3)
+    np.testing.assert_allclose(got, 1000 * want_lat + want_lon)

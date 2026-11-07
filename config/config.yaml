@@ -145,11 +145,13 @@ sif_apar:
   # Persistence biases SIF/APAR LOW if structure declines before ignition (stale, too-high fPAR): same direction
   # as the signal sought. The NO-PERSISTENCE run is the reference for validating any lead time.
   fpar_persist_sensitivity: {modis: [null], viirs: [8, null]}
-  screening:                     # applied in the anomaly stage, after post-fire masking [TODO thresholds]
-    fpar_min: null
-    par_min: null
-    sif_weight_min: null
-    robust_k_mad: null
+  screening:                     # input validity of SIF/APAR (approved 2026-11-08, before any fire series was extracted).
+                                 # Derived on 1462 unburned shrubland/heathland cells outside the analysis
+                                 # (python -m physiofire.screening_thresholds --classes shrubland wet_heath): below
+                                 # each threshold the relative noise exceeds 2x that of well-conditioned data.
+    fpar_min: 0.15               # removes 0.7 % of summer cell-days (sensitivity R20: no fPAR threshold)
+    par_min: 40.0                # W m-2; removes 0 % in summer (winter days)
+    sif_weight_min: 0.1          # TROPOSIF equivalent full pixels in the cell; removes 1.3 % in summer
   out_dir: data/processed
 anomalies:
   loess_frac: 0.4          # LOESS window as fraction of the (valid) observations (span used by Tang et al.)
@@ -168,7 +170,7 @@ anomalies:
   # cell's own series (+- half_window days) > k x robust noise scale of the cell -> removed. Persistent drops move
   # the running median too, so they are kept.
   spike_half_window: 3
-  spike_k: 6               # [TODO: confirm]
+  spike_k: 6               # approved 2026-11-08: removes 0.7 % of valid SIF/APAR cell-days (backlog 39: k = 4, 8)
   spike_min_neighbours: 3
   methods: [median_doy, loess]   # epoch analysis: median_doy MAIN, loess SENSITIVITY (epoch.series)
 
@@ -190,6 +192,9 @@ epoch:
     max_days_before_effis: 7
     early_ignition_reason: "Ignición > 7 días antes de EFFIS sin confirmación independiente: ventana previa posiblemente desalineada"
   burned_min_fraction: {fine: 0.25}               # burned cell: fraction of the cell inside the perimeter
+  prior_burn:              # decided 2026-11-07: burned cells with post-fire recovery are removed (fire kept if cells remain;
+    years: 5               # otherwise excluded): >= min_fraction of the cell burned in any of the `years` years before
+    min_fraction: 0.25     # the fire year by MCD64A1, VNP64A1, EFFIS perimeters or ESFire30 (Spain)
   controls:                # per fire, compared with the (burned-fraction weighted) mean of its burned cells
     n_min: 3               # fewer valid candidates -> fire reported without controls (no relaxation)
     n_max: 5
@@ -276,7 +281,14 @@ epoch:
   main_series: median_doy_trail15
   loess_trend_end_day: -60 # LOESS trend estimated with data before this day; held at its last value afterwards
   fpar_persist_days: 5     # SIF/APAR in the epoch: MODIS persistence (null = no persistence: reference run)
-  expected_sign: {sif_apar: -1, ndvi: -1, evi: -1, fwi: 1, aed: 1}   # direction of the pre-fire signal
+  expected_sign: {sif_apar: -1, ndvi: -1, evi: -1, fwi: 1, aed: 1}   # direction of the pre-fire signal; suffixed
+                           # variables (sif_apar_nopersist, ndvi_terra, evi_nbar, ...) take the sign of their base name
+  # Optical competitor (decided 2026-11-07): MAIN ndvi/evi = Terra + Aqua combined (mean of MOD09GA and MYD09GA when
+  # both are valid, the valid one otherwise; ~1 value every 1.6 days). SENSITIVITY: each platform and NBAR (MCD43A4).
+  optical_sensitivity: true
+  cutoff_offset_days: {ndvi_nbar: -8, evi_nbar: -8}   # NBAR uses observations up to t+7: masked from day -8
+  # Isolated-spike filter only for satellite retrievals (noise); FWI and AED are meteorological (not filtered).
+  spike_filter_variables: [sif_apar, ndvi, evi]
   effect_threshold_sd: 0.5 # lead time: earliest day from which the effect stays beyond this, in the expected sign
   bootstrap_n: 2000        # fire-level bootstrap for confidence intervals
   ci_level: 0.95
@@ -390,6 +402,26 @@ fwi:
     system_version: "4_1"
     grid: "0.25/0.25"
     raw_dir: data/raw/cems_fwi
+
+# Atmospheric evaporative demand (decided 2026-11-07): FAO-56 Penman-Monteith reference evapotranspiration (ET0,
+# short grass) from ERA5-Land daily fields on the native 0.1 deg grid (same source and grid as the FWI and PAR).
+# GLEAM v4.3a Ep (Penman, 0.1 deg, 1980-2024) as a check for 2018-2024 (backlog). An AED from the IPE group would
+# be assessed if provided.
+aed:
+  daily_collection: ECMWF/ERA5_LAND/DAILY_AGGR
+  hourly_collection: ECMWF/ERA5_LAND/HOURLY   # wind speed (mean of hourly speeds)
+  bands:
+    tmax: temperature_2m_max
+    tmin: temperature_2m_min
+    tdew: dewpoint_temperature_2m              # daily mean dew point -> actual vapour pressure (FAO-56 Eq. 14)
+    rs: surface_solar_radiation_downwards_sum  # J m-2 day-1
+    ps: surface_pressure                       # Pa, daily mean -> psychrometric constant
+    u10: u_component_of_wind_10m
+    v10: v_component_of_wind_10m
+  albedo: 0.23             # FAO-56 reference grass
+  start: "2017-01-01"
+  inputs_dir: data/interim/era5land_aed
+  out_dir: data/interim/era5land_aed
 
 random_seed: 42
 

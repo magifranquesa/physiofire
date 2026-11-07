@@ -230,13 +230,16 @@ Stack: Python 3.11 (`environment.yml`) con xarray, dask, rioxarray, zarr, netCDF
 - **Información más allá del FWI:** comparación descriptiva (diferencia incendio–control del FWI y de SIF/APAR en la misma figura); el AUC por clase de FWI, a la prueba completa.
 - **Arbolado:** pasa a la prueba completa (backlog 35); en 2025 solo 2 de los 5 incendios de arbolado tenían controles. El caso 2025 se centra en el estrato matorral.
 - **FWI:** el propio (ERA5-Land, 0,1°) pasa al análisis principal; el de EFFIS/CEMS, a sensibilidad (R17).
+- **Celdas quemadas con quemas previas:** se quitan las que tienen ≥ 25 % quemado en los 5 años anteriores (MCD64A1, VNP64A1, EFFIS o ESFire30); el incendio se mantiene si le quedan celdas (`epoch.prior_burn`). En 2025 quita 7 de 140 celdas y ningún incendio.
+- **NDVI/EVI:** competidor principal = combinado Terra + Aqua (media si hay ambos, el disponible si no); Terra y Aqua por separado y NBAR, como sensibilidad.
+- **AED:** ET0 FAO-56 con ERA5-Land (0,1°, misma fuente que FWI y PAR); GLEAM v4.3a como contraste para 2018–2024 (backlog). Si el grupo aporta una AED propia, se valora.
+- **Umbrales de validez de SIF/APAR:** derivados de celdas no quemadas ajenas al análisis, pendientes de aprobación antes de extraer series de incendios.
 - **Nieve:** sin máscara específica en el caso 2025 (ventanas de junio a agosto); GlobSnow, al backlog.
 
 ## Decisiones pendientes con el investigador
 
 - Fuente de la cartografía de Portugal, o EFFIS para ambos países.
 - Fuente meteorológica del análisis principal (ERA5-Land, o AEMET + IPMA).
-- Si se usa la AED ya calculada por el grupo o se calcula con FAO-56 Penman-Monteith.
 - Arbolado en el caso 2025 (ver "Decisiones tomadas").
 
 ## Contexto adicional

@@ -149,15 +149,20 @@ def trailing_mean(x: np.ndarray, window: int, min_frac: float) -> np.ndarray:
 # --------------------------------------------------------------------------- pipeline
 
 def compute(x: np.ndarray, days: np.ndarray, acfg: dict, cutoff: np.ndarray | None = None,
-            valid: np.ndarray | None = None, trend_end: np.ndarray | None = None) -> dict[str, np.ndarray]:
+            valid: np.ndarray | None = None, trend_end: np.ndarray | None = None,
+            spike: bool = True) -> dict[str, np.ndarray]:
     """Full chain for one variable. x: (time, ncell). Returns the masked/filtered input, the spike mask, raw
     anomalies per method and their trailing means per window: keys 'x', 'spikes', '<method>',
-    '<method>_trail<w>'. trend_end: see anomaly_loess (None = trend fitted on all data before the cut-off)."""
+    '<method>_trail<w>'. trend_end: see anomaly_loess (None = trend fitted on all data before the cut-off).
+    spike: apply the isolated-spike filter (retrieval noise of satellite variables; not for meteorological ones)."""
     x = apply_cutoff(np.asarray(x, dtype=float), days, cutoff)
     if valid is not None:
         x = np.where(valid, x, np.nan)
-    x, spikes = spike_filter(x, int(acfg["spike_half_window"]), float(acfg["spike_k"]),
-                             int(acfg["spike_min_neighbours"]))
+    if spike:
+        x, spikes = spike_filter(x, int(acfg["spike_half_window"]), float(acfg["spike_k"]),
+                                 int(acfg["spike_min_neighbours"]))
+    else:
+        spikes = np.zeros(x.shape, dtype=bool)
     out = {"x": x, "spikes": spikes}
     for m in acfg["methods"]:
         if m == "loess":

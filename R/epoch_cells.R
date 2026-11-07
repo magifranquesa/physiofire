@@ -1,6 +1,9 @@
 # Burned and control cells of each selected fire (simplified 2025 analysis, 0.05 deg grid).
 #
-# Burned cells: fraction of the cell inside the EFFIS perimeter >= epoch.burned_min_fraction[grid].
+# Burned cells: fraction of the cell inside the EFFIS perimeter >= epoch.burned_min_fraction[grid], minus cells
+# burned in the previous epoch.prior_burn$years years (>= epoch.prior_burn$min_fraction of the cell by any of MCD64A1,
+# VNP64A1, EFFIS or ESFire30): post-fire recovery. A fire left without burned cells is reported and not analysed.
+# Fires with exclude = TRUE in the fires table are skipped.
 # Controls (epoch.controls): 3-5 cells per fire, unburned since `unburned_since` up to the fire year (EFFIS
 # perimeters, MCD64A1 and VNP64A1 yearly burn history, ESFire30 perimeters in Spain), same dominant vegetation class
 # as the burned cells (epoch.controls.vegetation: FirEUrisk fuel classes, or CORINE 2018 groups), aridity index
@@ -31,6 +34,11 @@ dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
 gee_dir <- file.path(root, cfg$gee$out_dir)
 
 fires <- read_csv(fires_csv, col_types = cols(fire_id = col_character(), .default = col_guess()))
+if ("exclude" %in% names(fires)) {
+  ex <- as.logical(fires$exclude); ex[is.na(ex)] <- FALSE
+  if (any(ex)) message(sprintf("%d fires excluded in the table: %s", sum(ex), paste(fires$fire_id[ex], collapse = ", ")))
+  fires <- fires[!ex, ]
+}
 fires$ignition_date <- as.Date(fires$ignition_date)
 fires$year <- as.integer(format(fires$ignition_date, "%Y"))
 gpkg <- list.files(file.path(root, cfg$effis$out_dir), pattern = "^effis_iberia_[0-9]+_[0-9]+\\.gpkg$",
@@ -70,7 +78,22 @@ for (g in unlist(ec$grids)) {
   veg <- dominant_group(vf)
   thr <- as.numeric(cc$max_burned_fraction[[g]])
   hist <- list(mcd64a1 = burn_hist("burn_history", g), vnp64a1 = burn_hist("burn_history_vnp64a1", g))
+  pb <- ec$prior_burn
   for (y in sort(unique(fires$year))) {
+    # burned fraction of each cell in the pb$years years before the fire year, max over the four sources
+    pyrs <- seq(y - as.integer(pb$years), y - 1)
+    p_hist <- lapply(hist, function(b) {
+      if (min(pyrs) < b$y0) stop(sprintf("burn history starts in %d; prior-burn rule needs %d", b$y0, min(pyrs)))
+      max(b$r[[pyrs - b$y0 + 1]], na.rm = TRUE)
+    })
+    e_p <- eff[eff$fire_year %in% pyrs, ]
+    if (min(pyrs) < min(eff$fire_year, na.rm = TRUE)) warning("EFFIS perimeters start after ", min(pyrs))
+    pe_cov <- if (nrow(e_p)) rasterize(vect(st_transform(e_p, 4326)), tmpl, cover = TRUE, background = 0) else tmpl * 0
+    pes <- pyrs[file.exists(file.path(esf_dir, vapply(pyrs, function(yy) gsub("\\{year\\}", yy, ec$esfire30$annual), "")))]
+    ps_cov <- max(rast(lapply(pes, function(yy) rasterize(vect(esfire(yy)), tmpl, cover = TRUE, background = 0))))
+    prior <- max(c(resample(p_hist[[1]], tmpl, method = "near"), resample(p_hist[[2]], tmpl, method = "near"),
+                   pe_cov, ps_cov), na.rm = TRUE)
+    names(prior) <- "prior_burn"
     yrs <- seq(since, y)
     ok_y <- lapply(names(hist), function(h) {
       b <- hist[[h]]
@@ -86,18 +109,20 @@ for (g in unlist(ec$grids)) {
     unburned <- ok_y[[1]] & ok_y[[2]] & (e_cov <= thr) & (s_cov <= thr)
     names(unburned) <- "unburned"
     layers <- c(resample(static, tmpl, method = "near"), resample(veg, tmpl, method = "near"),
-                resample(unburned, tmpl, method = "near"))
+                resample(unburned, tmpl, method = "near"), prior)
     for (i in which(fires$year == y)) {
       f <- fires[i, ]
       per <- eff[eff$id == f$fire_id, ]
       if (!nrow(per)) { status[[length(status) + 1]] <- data.frame(fire_id = f$fire_id, grid = g,
                                                                     status = "perimeter_not_found"); next }
-      s <- select_fire_cells(per, tmpl, layers, cc, as.numeric(ec$burned_min_fraction[[g]]), groups)
+      s <- select_fire_cells(per, tmpl, layers, cc, as.numeric(ec$burned_min_fraction[[g]]), groups,
+                             prior_max = as.numeric(pb$min_fraction))
       status[[length(status) + 1]] <- data.frame(
         fire_id = f$fire_id, grid = g, status = s$status, fire_veg = s$fire_veg,
         stratum = group_stratum(s$fire_veg, strata),
         n_burned = if (is.null(s$cells)) 0L else sum(s$cells$group == "burned"),
-        n_control = if (is.null(s$cells)) 0L else sum(s$cells$group == "control"))
+        n_control = if (is.null(s$cells)) 0L else sum(s$cells$group == "control"),
+        n_burned_removed_prior = s$n_prior_removed)
       if (!is.null(s$cells)) {
         all_cells[[length(all_cells) + 1]] <- data.frame(fire_id = f$fire_id, grid = g, fire_veg = s$fire_veg,
                                                          stratum = group_stratum(s$fire_veg, strata), s$cells) |>

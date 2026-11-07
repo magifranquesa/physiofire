@@ -76,9 +76,11 @@ group_stratum <- function(group, strata) {
 # --- Burned and control cells for one fire ------------------------------------------------------------------------
 # perimeter: sf (one or more polygons of the fire), any CRS.
 # layers: SpatRaster aligned with tmpl, with land_fraction, aridity_index, elevation_m, veg (group index) and
-#         unburned (1 = no burn since ccfg$unburned_since up to the fire year, by EFFIS, MCD64A1, VNP64A1, ESFire30).
-# Returns list(cells = data.frame or NULL, status, fire_veg).
-select_fire_cells <- function(perimeter, tmpl, layers, ccfg, burned_min, veg_names) {
+#         unburned (1 = no burn since ccfg$unburned_since up to the fire year, by EFFIS, MCD64A1, VNP64A1, ESFire30);
+#         optionally prior_burn (max burned fraction of the cell in the years before the fire, any source).
+# prior_max: burned cells with prior_burn >= prior_max are removed (post-fire recovery); NULL = no rule.
+# Returns list(cells = data.frame or NULL, status, fire_veg, n_prior_removed).
+select_fire_cells <- function(perimeter, tmpl, layers, ccfg, burned_min, veg_names, prior_max = NULL) {
   res <- res(tmpl)[1]
   per <- st_union(st_make_valid(st_transform(perimeter, 4326)))
   cover <- rasterize(vect(st_sf(geometry = per)), tmpl, cover = TRUE, background = 0)
@@ -86,7 +88,17 @@ select_fire_cells <- function(perimeter, tmpl, layers, ccfg, burned_min, veg_nam
   ct$burned_fraction[is.na(ct$burned_fraction)] <- 0
   min_land <- as.numeric(ccfg$min_land_fraction)
   burned <- ct[ct$burned_fraction >= burned_min & !is.na(ct$land_fraction) & ct$land_fraction >= min_land, ]
-  if (!nrow(burned)) return(list(cells = NULL, status = "no_burned_cells", fire_veg = NA_character_))
+  if (!nrow(burned)) return(list(cells = NULL, status = "no_burned_cells", fire_veg = NA_character_,
+                                 n_prior_removed = 0L))
+  n_prior <- 0L
+  if (!is.null(prior_max)) {
+    if (!"prior_burn" %in% names(burned)) stop("prior_max given but no prior_burn layer")
+    drop <- !is.na(burned$prior_burn) & burned$prior_burn >= prior_max
+    n_prior <- sum(drop)
+    burned <- burned[!drop, ]
+    if (!nrow(burned)) return(list(cells = NULL, status = "no_burned_cells_after_prior_burn",
+                                   fire_veg = NA_character_, n_prior_removed = n_prior))
+  }
 
   w <- burned$burned_fraction
   veg_w <- tapply(w, burned$veg, sum)
@@ -129,7 +141,7 @@ select_fire_cells <- function(perimeter, tmpl, layers, ccfg, burned_min, veg_nam
   out <- rbind(burned[, cols], cand[, cols])
   out$veg <- veg_names[out$veg]
   list(cells = out, status = status, fire_veg = veg_names[fire_veg],
-       ref = c(aridity_index = ref_ai, elevation_m = ref_el))
+       ref = c(aridity_index = ref_ai, elevation_m = ref_el), n_prior_removed = n_prior)
 }
 
 # --- Statistics ---------------------------------------------------------------------------------------------------
@@ -170,6 +182,15 @@ effect_table <- function(fd, strata = character(), B = 2000, level = 0.95, seed 
               .groups = "drop") |>
     mutate(dz = mean_diff / sd_diff)
 }
+# Expected sign of a variable: exact name, else the longest configured name it starts with (e.g. sif_apar_nopersist
+# -> sif_apar, ndvi_terra -> ndvi); NULL if none.
+variable_sign <- function(v, expected_sign) {
+  if (!is.null(expected_sign[[v]])) return(unname(expected_sign[[v]]))
+  k <- names(expected_sign)[startsWith(v, paste0(names(expected_sign), "_"))]
+  if (!length(k)) return(NULL)
+  unname(expected_sign[[k[which.max(nchar(k))]]])
+}
+
 
 # Lead time: earliest day d such that, on every day from d to -1, the effect is at least `threshold` SD in the
 # expected direction and its CI excludes zero. Returned as days before ignition (0 = never, i.e. not on day -1).
@@ -182,7 +203,7 @@ lead_time <- function(eff, expected_sign, threshold, strata = character(), what 
     group_by(across(all_of(c(strata, "grid", "variable", "series")))) |>
     arrange(day_rel, .by_group = TRUE) |>
     summarise(lead_days = {
-                s <- unname(expected_sign[[first(variable)]])
+                s <- variable_sign(first(variable), expected_sign)
                 if (is.null(s)) s <- NA_real_
                 met <- !is.na(s) & s * .data[[est]] >= threshold &
                   ((s < 0 & .data[[hi]] < 0) | (s > 0 & .data[[lo]] > 0))

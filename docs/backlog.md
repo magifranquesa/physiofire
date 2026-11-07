@@ -29,7 +29,9 @@ Cada entrada indica qué se prueba, contra qué referencia y su código en la ta
 | 18 | FWI operativo de CEMS (ERA5, 0,25°) como referencia. El 7–16 % de los controles de los 24 incendios comparte celda de 0,25° con alguna celda quemada (0 % a 0,1°), lo que reduce por construcción la diferencia incendio–control del FWI. Desde el 7 de noviembre de 2026, el FWI propio con ERA5-Land a 0,1° es el del análisis principal | FWI propio con ERA5-Land a 0,1° | R17 |
 | 31 | Vegetación de CORINE 2018 (grupo dominante) para emparejar controles y estratificar. Diagnóstico ya hecho con la lista corta: 35 de 53 incendios con controles (1 de arbolado), frente a 37 (2 de arbolado) con FirEUrisk | clase dominante de FirEUrisk | R18 |
 | 16 | Umbral del efecto distinto de 0,5 desviaciones típicas | 0,5 DE | — |
-| 36 | Sin los incendios con una sola celda quemada (Alburquerque, 278487, y Lazarim, 281621, en 2025) | los 22 incendios | R19 |
+| 36 | Sin los incendios con una sola celda quemada (Alburquerque, 278487, Lazarim, 281621, y Riofrío de Aliste, 278425, tras quitar las celdas con quemas previas) | los 22 incendios | R19 |
+| 38 | SIF/APAR sin el umbral de fPAR mínimo: un fPAR bajo puede ser parte de la señal previa al incendio, así que el filtro de validez no debe crear ni ocultar la antelación | con umbral | R20 |
+| 39 | Filtro de picos con k = 4 y k = 8 (con k = 6 quita el 0,7 % de los datos válidos en matorral sin quemar) | k = 6 | — |
 
 ## Comprobaciones de datos
 
@@ -37,6 +39,7 @@ Cada entrada indica qué se prueba, contra qué referencia y su código en la ta
 | --- | --- | --- | --- |
 | 21 | Validación de la máscara de fuentes estáticas: construida con `type = 2` de 2018–2024 y evaluada con el archivo estándar de 2025–2026 (aciertos y detecciones `type = 0` eliminadas por error) | — | QC S1.7 |
 | 22 | Validación de la fecha de ignición con ESFire30 (versión con fechas corregidas con MODIS, 2001–2025, solo España) y con la EGIF (registro "ESFire30 Causes", Zenodo 18449006) | regla de la fecha más temprana | métodos 2.3 |
+| 37 | AED: ET0 FAO-56 de ERA5-Land frente a la Ep de GLEAM v4.3a (Penman, 0,1°, 1980–2024) en 2018–2024: correlación de anomalías diarias por celda y estrato | ET0 de ERA5-Land | métodos 2.7 |
 | 27 | Clase de FirEUrisk (hacia 2019) frente a un mapa más reciente (p. ej., ESA WorldCover 2021) y frente a las zonas quemadas en 2017–2024: un píxel quemado poco antes de 2019 puede figurar como matorral o pastizal | FirEUrisk | métodos 2.9 |
 | 33 | Bosque de frondosas perennifolias (encinares, alcornocales): el mapa europeo de FirEUrisk no tiene los tipos 1111/1112; comprobar en qué clase caen (bosque abierto, matorral, cultivo leñoso) con CORINE 311 y el Mapa Forestal de España **(verificar acceso)** | FirEUrisk | métodos 2.9 |
 
