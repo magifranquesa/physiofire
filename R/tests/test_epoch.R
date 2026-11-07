@@ -20,7 +20,7 @@ values(layers) <- cbind(1, 0.5 + 0.1 * (ct$lat - 42), 600 + 100 * (ct$lon + 7), 
 per <- st_sf(geometry = st_sfc(st_polygon(list(matrix(c(-7.1, 41.9, -6.9, 41.9, -6.9, 42.1, -7.1, 42.1, -7.1, 41.9),
                                                        ncol = 2, byrow = TRUE))), crs = 4326))
 ccfg <- list(n_min = 3, n_max = 5, min_dist_km = 10, max_dist_km = 50, min_land_fraction = 0.5,
-             max_aridity_abs_diff = 0.1, max_elevation_diff_m = 200)
+             max_aridity_rel_diff = 0.15, max_elevation_diff_m = 200)
 s <- select_fire_cells(per, tmpl, layers, ccfg, burned_min = 0.5, veg_names = c("woodland", "shrubland"))
 b <- s$cells[s$cells$group == "burned", ]
 k <- s$cells[s$cells$group == "control", ]
@@ -31,7 +31,7 @@ ok(all(k$dist_cell_km >= 10) && all(k$dist_centre_km <= 50), "controls 10-50 km 
 ok(all(k$veg == "shrubland"), "controls share the fire's dominant vegetation")
 ok(!any(k$lat > 42.55 & k$lat < 42.65), "previously burned cells excluded")
 ok(all(abs(k$elevation_m - s$ref["elevation_m"]) <= 200), "elevation within tolerance")
-ok(all(abs(k$aridity_index - s$ref["aridity_index"]) <= 0.1), "aridity within tolerance")
+ok(all(abs(k$aridity_index - s$ref["aridity_index"]) <= 0.15 * s$ref["aridity_index"]), "aridity within relative tolerance")
 ok(identical(group_stratum(c("heathland", "coniferous", "agricultural"),
                            list(woodland = "coniferous", shrubland = c("heathland", "sclerophyllous"))),
              c("shrubland", "woodland", "other")), "group to stratum")

@@ -413,6 +413,18 @@ MODIS tiene además el estado de nubes heredado de MOD09 en `FparLai_QC` (bits 3
 - **Incluye 2025** (2428 polígonos). Resuelve la pregunta pendiente de CLAUDE.md sobre si la cartografía de Ochoa llega a 2025.
 - Uso actual: criterio "sin quemar desde 2017" de los controles. La versión fechada puede servir para validar la fecha de ignición en España (backlog 22). En Zenodo hay además "ESFire30 Causes" (18449006, 93 MB) y "Validation ESFire30" (18646713, 1 GB); no se han descargado.
 
+**Mapa europeo de combustibles de FirEUrisk** ✅ (clasificación principal de la vegetación desde el 7 de noviembre de 2026)
+- e-cienciaDatos, DOI 10.21950/YABYCN, versión 2.0 (27 de mayo de 2022, actualizada el 29 de junio de 2022), CC BY 4.0. Artículo: Aragoneses et al. (2023), ESSD 15:1287–1315.
+- Archivos, en `data/raw/fireurisk_fuel/yabycn_v2/`:
+  - `FirEUrisk_Europe_fuel_map.tif` (1,7 MB; MD5 25a021569fb63b4d9088a032c81bd932);
+  - manual de usuario (PUM, con la leyenda en la tabla 1);
+  - `readme-en.txt`.
+  - Descarga directa por la API de Dataverse: `https://edatos.consorciomadrono.es/api/access/datafile/{9603, 9685, 9684}`.
+- GeoTIFF de una banda (float32, NaN como sin datos), 1 km, EPSG:3035. Datos de entrada de 2018–2020.
+- Tipos presentes en la Península (los 20 del mapa europeo): 1121, 1122, 1211, 1212, 1301, 1302, 21–23, 31–33, 41, 42, 51–53, 61, 62 y 7. El mar se codifica como 7. No hay frondosas perennifolias (1111/1112).
+- `python -m physiofire.preprocess.fuel` escribe `data/interim/static/fuel_fireurisk_{base,fine}.nc` (`type_fraction` por tipo, con 4 × 4 subpuntos por píxel). La agrupación en clases se hace al leer (`epoch.fuel.classes`), así que se puede cambiar sin volver a agregar.
+- Concordancia con CORINE y reparto por clase: ver `docs/supplementary_qc.md`, S1.8.
+
 **Historial de quemas de VNP64A1** ✅
 - `python -m physiofire.download.gee burn_history --burn-product vnp64a1` escribe `burn_history_vnp64a1_{grid}_2013_2025.nc`, con las mismas variables que el de MCD64A1.
 
@@ -442,4 +454,4 @@ Tang es la base conceptual, no un método a replicar (CLAUDE.md, 7 de noviembre 
 - Anomalías respecto a la mediana por día del año, con medias hacia atrás, en lugar de LOESS más ciclo medio y suavizado centrado.
 - Filtro de picos por celda en lugar del filtro de percentiles 1–99 global.
 - Rejilla de 0,05° en lugar de 0,25°.
-- Vegetación de CORINE 2018 en lugar de MCD12C1.
+- Vegetación del mapa de combustibles de FirEUrisk (con CORINE 2018 como apoyo) en lugar de MCD12C1.

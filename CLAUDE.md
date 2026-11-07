@@ -38,10 +38,10 @@ Responder a una pregunta para decidir si seguir:
 
 **Resultados:**
 1. Días de antelación con que cada variable se separa de los controles.
-2. Capacidad de SIF/APAR para distinguir incendio de no incendio dentro de cada clase de FWI.
+2. Información más allá del FWI: en la misma figura, diferencia incendio–control del FWI y de SIF/APAR (comparación descriptiva). Si el FWI es parecido entre incendios y controles y SIF/APAR difiere, es evidencia de valor añadido. El AUC dentro de cada clase de FWI, en la prueba completa.
 3. Todo estratificado por tipo de vegetación (matorral, arbolado y pasto como control negativo) y por país.
 
-**Criterio de decisión:** seguir si SIF/APAR se adelanta al NDVI/EVI y discrimina dentro de las clases de FWI, al menos en matorral y arbolado. Si no, replantear (otra resolución, SIF/PAR, otra región) antes de invertir más. Un resultado negativo también es publicable.
+**Criterio de decisión:** seguir si SIF/APAR se adelanta al NDVI/EVI y difiere entre incendios y controles cuando la diferencia del FWI es pequeña, al menos en matorral y arbolado (el arbolado, si hay incendios con controles suficientes; ver "Decisiones tomadas"). Si no, replantear (otra resolución, SIF/PAR, otra región) antes de invertir más. Un resultado negativo también es publicable.
 
 **Fuera de alcance por ahora:** réplica de la correlación cruzada de Tang, ESI/GLEAM, LFMC, modelo predictivo, bajada de escala, sistema operativo, visor y FLEX.
 
@@ -65,6 +65,7 @@ Responder a una pregunta para decidir si seguir:
   - vegetación dominante clara;
   - sin solape con otros incendios en la ventana de 60 días.
 - **Muestra equilibrada:** matorral, arbolado y pasto; España y Portugal; varias regiones y años.
+- **Incendios extremos:** la base de datos de Solano-Romero et al. (preprint ESSD, 10.5194/essd-2026-236) no se usa en la prueba de concepto; línea futura en `docs/backlog.md` y `docs/literature/notes.md`.
 - **Registro:** una tabla de incendios versionada (por ejemplo `data/fires/selected_fires.csv`) con identificador, país, fecha, superficie, vegetación, fuentes de la fecha y criterios que cumple. Irá como material suplementario.
 - **Periodo:** TROPOMI empieza en mayo de 2018. Los incendios de 2018 solo valen si la ventana de 60 días queda dentro del periodo con datos (por ejemplo, Monchique en agosto de 2018). Incluir también 2022, 2024 y, sobre todo, 2025 (caso inicial: grandes incendios de agosto de 2025 en el noroeste de España y en Portugal, con ola de calor).
 - **2026:** ensayo casi operativo, solo si hay perímetros provisionales y datos (CERES termina el 31 de agosto de 2026; usar PAR de ERA5 a partir de ahí).
@@ -120,7 +121,8 @@ Pasos de Tang que sirvieron de punto de partida (la versión vigente está en `d
 | NDVI, EVI | MOD09GA/MYD09GA v061 diario (principal); NBAR de MCD43A4 como sensibilidad | MCD43C4 no está en GEE |
 | Meteorología | ERA5-Land, AEMET (grupo), IPMA | Ver "Meteorología y FWI" |
 | FWI de referencia | EFFIS / Copernicus EMS en el EWDS (no en el CDS) | 0,25°, calculado con ERA5 a las 12 hora local; versión y acceso con la cuenta del CDS **(verificar)** |
-| Cobertura del suelo | CORINE Land Cover 2018 (GEE, 100 m) agregado a 0,05° | Para estratificar y emparejar controles. MCD12C1 deja de usarse (casi no asigna matorral en los incendios de 2025) |
+| Tipos de combustible | Mapa europeo de combustibles de FirEUrisk v2.0 (Aragoneses et al., 2023, ESSD 15:1287–1315; datos 10.21950/YABYCN, 1 km, hacia 2019, 20 tipos) | Clasificación principal: clase dominante a 0,05° para la lista corta, los estratos y el emparejamiento de controles |
+| Cobertura del suelo | CORINE Land Cover 2018 (GEE, 100 m) agregado a 0,05° | Apoyo y prueba de sensibilidad (R18). MCD12C1 deja de usarse (casi no asigna matorral en los incendios de 2025) |
 | Aridez | Global Aridity Index v3.1 (figshare 10.6084/m9.figshare.7504448.v7) | P/ET0 de 1970–2000, 30″. La v3 (figshare v5) tenía un error en la ET0 |
 | Altitud | SRTM 90 m (`CGIAR/SRTM90_V4`) | Media por celda |
 
@@ -222,8 +224,10 @@ Stack: Python 3.11 (`environment.yml`) con xarray, dask, rioxarray, zarr, netCDF
 - **Caso 2025:** selección manual de 10–15 incendios de la lista corta de EFFIS > 2000 ha (`docs/fire_shortlist_2025.md`), guardada con fecha antes de analizar. Las reglas automáticas, para la prueba completa (backlog).
 - **Fecha de ignición:** la más temprana entre EFFIS, VIIRS, MCD64A1 y VNP64A1 (el error peligroso es una fecha tardía).
 - **Escala:** 0,05°. **Anomalías:** mediana por día del año; LOESS como sensibilidad.
-- **Umbrales** (en `config.yaml`, sección `epoch`): celda quemada ≥ 25 %; controles 3–5 por incendio, a 10–50 km, 0 % quemado desde 2017 (EFFIS, MCD64A1, VNP64A1 y ESFire30), mismo grupo dominante de CORINE, aridez ±0,1 y altitud ±200 m; antelación = primer día desde el que el efecto se mantiene ≥ 0,5 DE hasta el día −1.
-- **Vegetación:** CORINE 2018. **Aridez:** Global-AI v3.1. **PAR:** ERA5-Land.
+- **Umbrales** (en `config.yaml`, sección `epoch`): celda quemada ≥ 25 %; controles 3–5 por incendio, a 10–50 km, 0 % quemado desde 2017 (EFFIS, MCD64A1, VNP64A1 y ESFire30), misma clase dominante de FirEUrisk, aridez ±15 % (relativa al índice de las celdas quemadas) y altitud ±200 m; antelación = primer día desde el que el efecto se mantiene ≥ 0,5 DE hasta el día −1.
+- **Vegetación:** mapa de combustibles de FirEUrisk agrupado en bosque cerrado, bosque abierto, matorral, brezal y zonas húmedas, pastizal, cultivos y sin combustible (`config.yaml`, `epoch.fuel.classes`); estratos: arbolado = bosque cerrado o abierto, matorral = matorral o brezal, pasto = pastizal. CORINE 2018 como apoyo. **Aridez:** Global-AI v3.1. **PAR:** ERA5-Land. **LOESS:** tendencia ajustada antes del día −60, como sensibilidad. **ESFire30:** desde 2017 hasta el año del incendio.
+- **Información más allá del FWI:** comparación descriptiva (diferencia incendio–control del FWI y de SIF/APAR en la misma figura); el AUC por clase de FWI, a la prueba completa.
+- **Arbolado:** se decide con la lista regenerada con FirEUrisk; si sigue sin controles suficientes, el caso 2025 se centra en matorral y el arbolado pasa a la prueba completa.
 - **Nieve:** sin máscara específica en el caso 2025 (ventanas de junio a agosto); GlobSnow, al backlog.
 
 ## Decisiones pendientes con el investigador
@@ -231,7 +235,7 @@ Stack: Python 3.11 (`environment.yml`) con xarray, dask, rioxarray, zarr, netCDF
 - Fuente de la cartografía de Portugal, o EFFIS para ambos países.
 - Fuente meteorológica del análisis principal (ERA5-Land, o AEMET + IPMA).
 - Si se usa la AED ya calculada por el grupo o se calcula con FAO-56 Penman-Monteith.
-- Discriminación dentro de las clases de FWI: estadístico (p. ej., AUC por clase) y umbrales de clase de EFFIS.
+- Arbolado en el caso 2025 (ver "Decisiones tomadas").
 
 ## Contexto adicional
 

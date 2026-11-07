@@ -26,7 +26,8 @@ Cada entrada indica qué se prueba, contra qué referencia y su código en la ta
 | 26 | NDVI/EVI de NBAR (MCD43A4), enmascarado desde el día −8 | NDVI/EVI diario de MOD09GA/MYD09GA | R14 |
 | 2 | Terra y Aqua por separado; diferencia Aqua − Terra del NDVI diario por año y hora media de paso por año (deriva orbital) | — | R15 |
 | 20 | Fecha de ignición con detecciones VIIRS de confianza alta solamente | confianza nominal y alta | R16 |
-| 18 | FWI propio con ERA5-Land a mediodía a 0,05° | FWI de CEMS a 0,25° | R17 |
+| 18 | FWI propio con ERA5-Land a mediodía a 0,05°. Además de la resolución: con el FWI de 0,25°, parte de los controles a 10–50 km comparten celda de FWI con las celdas quemadas, lo que reduce por construcción la diferencia incendio–control del FWI | FWI de CEMS a 0,25° | R17 |
+| 31 | Vegetación de CORINE 2018 (grupo dominante) para emparejar controles y estratificar. Diagnóstico ya hecho con la lista corta: 35 de 53 incendios con controles (1 de arbolado), frente a 37 (2 de arbolado) con FirEUrisk | clase dominante de FirEUrisk | R18 |
 | 16 | Umbral del efecto distinto de 0,5 desviaciones típicas | 0,5 DE | — |
 
 ## Comprobaciones de datos
@@ -35,7 +36,8 @@ Cada entrada indica qué se prueba, contra qué referencia y su código en la ta
 | --- | --- | --- | --- |
 | 21 | Validación de la máscara de fuentes estáticas: construida con `type = 2` de 2018–2024 y evaluada con el archivo estándar de 2025–2026 (aciertos y detecciones `type = 0` eliminadas por error) | — | QC S1.7 |
 | 22 | Validación de la fecha de ignición con ESFire30 (versión con fechas corregidas con MODIS, 2001–2025, solo España) y con la EGIF (registro "ESFire30 Causes", Zenodo 18449006) | regla de la fecha más temprana | métodos 2.3 |
-| 27 | CORINE 2018 frente a un mapa más reciente (p. ej., ESA WorldCover 2021) para la vegetación dominante | CORINE 2018 | métodos 2.9 |
+| 27 | Clase de FirEUrisk (hacia 2019) frente a un mapa más reciente (p. ej., ESA WorldCover 2021) y frente a las zonas quemadas en 2017–2024: un píxel quemado poco antes de 2019 puede figurar como matorral o pastizal | FirEUrisk | métodos 2.9 |
+| 33 | Bosque de frondosas perennifolias (encinares, alcornocales): el mapa europeo de FirEUrisk no tiene los tipos 1111/1112; comprobar en qué clase caen (bosque abierto, matorral, cultivo leñoso) con CORINE 311 y el Mapa Forestal de España **(verificar acceso)** | FirEUrisk | métodos 2.9 |
 
 ## Prueba completa (después del caso 2025)
 
@@ -43,6 +45,13 @@ Cada entrada indica qué se prueba, contra qué referencia y su código en la ta
 | --- | --- | --- | --- |
 | 23 | Reglas automáticas de selección de incendios: superficie mínima, marca de coherencia con un mínimo de actividad previa (p. ej. ≥ 5 % de las detecciones VIIRS o algún píxel quemado de MCD64A1/VNP64A1), vegetación dominante, solape, temporadas válidas y sin quemas en los 5 años anteriores | El caso 2025 usa una selección manual (decidido el 7 de noviembre de 2026) | 2.3 |
 | 28 | Regresión logística condicional (FWI + AED + NDVI frente a + SIF/APAR) con conjuntos caso-control emparejados y bootstrap por episodios | Información más allá del FWI con más incendios | — |
+| 32 | Discriminación incendio–control de SIF/APAR dentro de cada clase de peligro del FWI (AUC por clase, umbrales de clase de EFFIS) | Sustituida en el caso 2025 por la comparación descriptiva FWI frente a SIF/APAR (decidido el 7 de noviembre de 2026); hacen falta más incendios por clase | 2.10 |
+
+## Líneas futuras (fuera de la prueba de concepto)
+
+| # | Tarea | Motivo |
+| --- | --- | --- |
+| 34 | Señal de SIF/APAR antes de incendios extremos y no extremos (2018–2022) con la base de datos de incendios extremos de Solano-Romero et al. (preprint ESSD, 10.5194/essd-2026-236; 0,25°, mensual, 2003–2022, celdas-mes extremas por anomalías regionales de área quemada de FireCCI51 y de FRP de MCD14ML). Notas en `docs/literature/notes.md` | ¿Es la anomalía fisiológica previa mayor o más temprana en los incendios extremos? |
 
 ## Solo comparabilidad con Tang et al. (prioridad baja)
 

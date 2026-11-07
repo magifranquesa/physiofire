@@ -189,9 +189,11 @@ epoch:
                            # MCD64A1, VNP64A1 (yearly burn history) and ESFire30 perimeters (Spain only) ...
     max_burned_fraction: {fine: 0.0}   # ... above this fraction of the cell (0 = not a single burned pixel)
     min_land_fraction: 0.5
-    max_aridity_abs_diff: 0.1    # |AI_control - AI_burned| (Global-AI v3.1, P / ET0)
+    max_aridity_rel_diff: 0.15   # |AI_control - AI_burned| / AI_burned (Global-AI v3.1, P / ET0); decided 2026-11-07
+                                 # (replaces the absolute +-0.1, too tight in the humid NW and too loose in arid areas)
     max_elevation_diff_m: 200    # |elevation_control - elevation_burned| (SRTM 90 m cell mean)
-    vegetation: corine           # dominant group of epoch.corine.groups (CORINE 2018) in burned cells and controls
+    vegetation: fuel             # dominant class used for matching and strata: fuel (epoch.fuel.classes, FirEUrisk,
+                                 # main) or corine (epoch.corine.groups, support)
   esfire30:                # Landsat 30 m annual burned-area perimeters, peninsular Spain (Ochoa et al.; CC BY 4.0)
     doi: 10.5281/zenodo.20257001
     raw_dir: data/raw/esfire30/zenodo_20257001
@@ -216,10 +218,35 @@ epoch:
       agroforestry: [244]          # agro-forestry areas (dehesas, montados)
       artificial: [111, 112, 121, 122, 123, 124, 131, 132, 133, 141, 142]
       water_wetland: [335, 411, 412, 421, 422, 423, 511, 512, 521, 522, 523]
-  strata:                  # analysis strata (results by vegetation) from the fire's dominant CORINE group
-    woodland: [broadleaved, coniferous, mixed_forest]
-    shrubland: [heathland, sclerophyllous, transitional]
-    grassland: [natural_grassland]   # negative control (cured grass = dead fuel)
+  fuel:                    # FirEUrisk European fuel map (main vegetation classification; python -m physiofire.preprocess.fuel)
+    source: FirEUrisk European fuel map v2.0, first-level fuel types, 1 km, EPSG:3035, circa 2019 (Aragoneses et al. 2023)
+    doi: 10.21950/YABYCN   # e-cienciaDatos, CC BY 4.0; legend in the Product User Manual (Table 1)
+    file: data/raw/fireurisk_fuel/yabycn_v2/FirEUrisk_Europe_fuel_map.tif
+    out_dir: data/interim/static
+    subsamples: 4          # k x k sub-points per 1 km pixel when assigning area to 0.05 deg cells
+    types: [1121, 1122, 1211, 1212, 1301, 1302, 21, 22, 23, 31, 32, 33, 41, 42, 51, 52, 53, 61, 62, 7]
+    # 1121/1122 broadleaf deciduous open/closed, 1211/1212 needleleaf evergreen open/closed, 1301/1302 mixed
+    # open/closed (open = canopy cover 15-70 %, closed = 70-100 %); 21-23 shrubland, fuel depth low/medium/high;
+    # 31-33 grassland, low/medium/high; 41 herbaceous and 42 woody cropland; 51-53 wet and peat/semi-peat land
+    # (tree, shrubland, grassland); 61-62 urban; 7 nonfuel (water, snow, bare soil, sparse vegetation; also sea).
+    # Broadleaf evergreen forest (1111/1112) is not mapped in the European product.
+    classes:               # proposed 2026-11-07; dominant class = largest fraction of the cell
+      closed_forest: [1122, 1212, 1302]
+      open_forest: [1121, 1211, 1301]
+      shrubland: [21, 22, 23]
+      wet_heath: [51, 52, 53]
+      grassland: [31, 32, 33]
+      cropland: [41, 42]
+      nonfuel: [61, 62, 7]
+  strata:                  # analysis strata (results by vegetation) from the fire's dominant class, per source
+    fuel:
+      woodland: [closed_forest, open_forest]
+      shrubland: [shrubland, wet_heath]
+      grassland: [grassland]           # negative control (cured grass = dead fuel)
+    corine:
+      woodland: [broadleaved, coniferous, mixed_forest]
+      shrubland: [heathland, sclerophyllous, transitional]
+      grassland: [natural_grassland]
   static:
     dem: CGIAR/SRTM90_V4    # 90 m (SRTM 30 m exceeds GEE user memory for the area mean)
     era5land_monthly: ECMWF/ERA5_LAND/MONTHLY_AGGR   # superseded aridity (P/PET, PET overestimated): not used
@@ -307,7 +334,8 @@ ignition:
   burn_date_dir: data/interim/gee/burndate   # {product}_burndate_*.nc (python -m physiofire.download.gee burn_dates)
 
 # Short list for the manual selection of the 2025 case (R/fire_shortlist.R -> docs/fire_shortlist_2025.md).
-# Vegetation from CORINE 2018 on the 0.05 deg grid (epoch.corine); MCD12C1 is no longer used for vegetation.
+# Vegetation from the FirEUrisk fuel map (epoch.fuel, main) and CORINE 2018 (epoch.corine, support) on the 0.05 deg
+# grid; MCD12C1 is no longer used for vegetation.
 shortlist:
   min_area_ha: 2000
 

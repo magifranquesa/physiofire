@@ -2,14 +2,16 @@
 #
 # Burned cells: fraction of the cell inside the EFFIS perimeter >= epoch.burned_min_fraction[grid].
 # Controls (epoch.controls): 3-5 cells per fire, unburned since `unburned_since` up to the fire year (EFFIS
-# perimeters, MCD64A1 and VNP64A1 yearly burn history, ESFire30 perimeters in Spain), same dominant CORINE 2018 group
-# as the burned cells, aridity index (Global-AI v3.1) and elevation within tolerance, and between min_dist_km (whole
-# cell) and max_dist_km (centre) from the perimeter.
+# perimeters, MCD64A1 and VNP64A1 yearly burn history, ESFire30 perimeters in Spain), same dominant vegetation class
+# as the burned cells (epoch.controls.vegetation: FirEUrisk fuel classes, or CORINE 2018 groups), aridity index
+# (Global-AI v3.1, relative tolerance) and elevation within tolerance, and between min_dist_km (whole cell) and
+# max_dist_km (centre) from the perimeter.
 # Static inputs only: no vegetation or meteorological series are read.
 #
 # Input:  fires table (default epoch.selected_fires; columns fire_id = EFFIS id, ignition_date, ...),
 #         data/interim/fires/effis_iberia_*.gpkg, ESFire30 shapefiles, data/interim/gee/{static, mask_peninsula,
-#         corine_2018, burn_history, burn_history_vnp64a1}_*.nc, data/interim/static/aridity_gai_*.nc
+#         corine_2018, burn_history, burn_history_vnp64a1}_*.nc, data/interim/static/{aridity_gai,
+#         fuel_fireurisk}_*.nc
 # Output: {out_dir}/epoch_cells.csv and epoch_cells_status.csv
 #
 # Usage (from the repository root): Rscript R/epoch_cells.R [fires.csv] [out_dir] [config.yaml]
@@ -34,7 +36,8 @@ fires$year <- as.integer(format(fires$ignition_date, "%Y"))
 gpkg <- list.files(file.path(root, cfg$effis$out_dir), pattern = "^effis_iberia_[0-9]+_[0-9]+\\.gpkg$",
                    full.names = TRUE)
 eff <- st_read(gpkg, quiet = TRUE) |> mutate(id = as.character(id))
-groups <- names(ec$corine$groups)
+veg_src <- cc$vegetation
+strata <- ec$strata[[veg_src]]
 since <- as.integer(cc$unburned_since)
 
 nc <- function(path, var) rast(path, subds = var)
@@ -62,10 +65,9 @@ for (g in unlist(ec$grids)) {
               nc(file.path(root, ec$static$aridity$out_dir, sprintf("aridity_gai_%s.nc", g)), "aridity_index"),
               nc(file.path(gee_dir, sprintf("static_%s.nc", g)), "elevation_m"))
   names(static) <- c("land_fraction", "aridity_index", "elevation_m")
-  clc <- nc(file.path(gee_dir, sprintf("corine_%d_%s.nc", as.integer(ec$corine$year), g)), "fraction")
-  stopifnot(nlyr(clc) == length(groups))
-  names(clc) <- groups
-  veg <- dominant_group(clc)
+  vf <- vegetation_fractions(cfg, root, g, veg_src)
+  groups <- names(vf)
+  veg <- dominant_group(vf)
   thr <- as.numeric(cc$max_burned_fraction[[g]])
   hist <- list(mcd64a1 = burn_hist("burn_history", g), vnp64a1 = burn_hist("burn_history_vnp64a1", g))
   for (y in sort(unique(fires$year))) {
@@ -93,12 +95,12 @@ for (g in unlist(ec$grids)) {
       s <- select_fire_cells(per, tmpl, layers, cc, as.numeric(ec$burned_min_fraction[[g]]), groups)
       status[[length(status) + 1]] <- data.frame(
         fire_id = f$fire_id, grid = g, status = s$status, fire_veg = s$fire_veg,
-        stratum = group_stratum(s$fire_veg, ec$strata),
+        stratum = group_stratum(s$fire_veg, strata),
         n_burned = if (is.null(s$cells)) 0L else sum(s$cells$group == "burned"),
         n_control = if (is.null(s$cells)) 0L else sum(s$cells$group == "control"))
       if (!is.null(s$cells)) {
         all_cells[[length(all_cells) + 1]] <- data.frame(fire_id = f$fire_id, grid = g, fire_veg = s$fire_veg,
-                                                         stratum = group_stratum(s$fire_veg, ec$strata), s$cells) |>
+                                                         stratum = group_stratum(s$fire_veg, strata), s$cells) |>
           mutate(cell_id = sprintf("%s_%d_%d", g, iy, ix))
       }
     }

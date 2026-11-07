@@ -35,15 +35,38 @@ cell_polygons <- function(ct, res) {
   }), crs = 4326)
 }
 
-# Dominant land-cover group per cell: index (1-based, order of the layers) of the group with the largest fraction.
-# frac: SpatRaster with one layer per group (CORINE 2018 fractions, epoch.corine.groups).
+# Vegetation class fractions on grid g for a source (epoch.controls.vegetation):
+#   "fuel":   FirEUrisk fuel-type fractions (python -m physiofire.preprocess.fuel) summed into epoch.fuel.classes
+#   "corine": CORINE 2018 group fractions (epoch.corine.groups, GEE)
+# Returns a SpatRaster with one layer per class, named as in the config.
+vegetation_fractions <- function(cfg, root, g, source = cfg$epoch$controls$vegetation) {
+  ec <- cfg$epoch
+  if (source == "fuel") {
+    f <- file.path(root, ec$fuel$out_dir, sprintf("fuel_fireurisk_%s.nc", g))
+    tf <- rast(f, subds = "type_fraction")
+    types <- as.integer(unlist(ec$fuel$types))
+    stopifnot(nlyr(tf) == length(types))
+    cls <- ec$fuel$classes
+    out <- rast(lapply(names(cls), function(k) sum(tf[[match(as.integer(unlist(cls[[k]])), types)]])))
+    names(out) <- names(cls)
+  } else if (source == "corine") {
+    out <- rast(file.path(root, cfg$gee$out_dir, sprintf("corine_%d_%s.nc", as.integer(ec$corine$year), g)),
+                subds = "fraction")
+    stopifnot(nlyr(out) == length(ec$corine$groups))
+    names(out) <- names(ec$corine$groups)
+  } else stop("unknown vegetation source: ", source)
+  out
+}
+
+# Dominant vegetation class per cell: index (1-based, order of the layers) of the class with the largest fraction.
+# frac: SpatRaster with one layer per class (vegetation_fractions).
 dominant_group <- function(frac) {
   d <- which.max(frac)
   names(d) <- "veg"
   d
 }
 
-# Analysis stratum (woodland, shrubland, grassland, other) of a land-cover group (epoch.strata)
+# Analysis stratum (woodland, shrubland, grassland, other) of a vegetation class (epoch.strata[[source]])
 group_stratum <- function(group, strata) {
   out <- rep("other", length(group))
   for (s in names(strata)) out[group %in% unlist(strata[[s]])] <- s
@@ -81,7 +104,8 @@ select_fire_cells <- function(perimeter, tmpl, layers, ccfg, burned_min, veg_nam
   cand$dist_centre_km <- as.numeric(st_distance(pts, per_m)[, 1]) / 1000
   cand <- cand[cand$dist_centre_km <= max_km, ]
   cand$dist_cell_km <- as.numeric(st_distance(st_transform(cell_polygons(cand, res), 3035), per_m)[, 1]) / 1000
-  max_ai <- as.numeric(ccfg$max_aridity_abs_diff); max_el <- as.numeric(ccfg$max_elevation_diff_m)
+  # aridity tolerance relative to the burned cells' index: |AI_c - AI_b| / AI_b <= max_aridity_rel_diff
+  max_ai <- as.numeric(ccfg$max_aridity_rel_diff) * ref_ai; max_el <- as.numeric(ccfg$max_elevation_diff_m)
   ok <- cand$dist_cell_km >= min_km & cand$burned_fraction == 0 &
     !is.na(cand$land_fraction) & cand$land_fraction >= min_land &
     !is.na(cand$unburned) & cand$unburned == 1 &

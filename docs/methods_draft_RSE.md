@@ -43,7 +43,7 @@ All data are on a regular 0.05° latitude–longitude grid (about 4.3 × 5.6 km 
 
 Perimeters with VIIRS detections or burn dates inside them between 90 and 30 days before `FIREDATE` were flagged as possible merged perimeters or earlier fires (coherence flag). The 90-day lookback covers the 30-day dating window plus the 60-day epoch window.
 
-**Selection.** A short list was built with all 2025 EFFIS perimeters larger than 2000 ha in the study area (53 perimeters; Table S1). Large fires were preferred because each covers several 0.05° cells. For each perimeter the short list gives the date of each source, the final ignition date, the coherence flag, the CORINE vegetation composition (Section 2.9), and the number of burned cells and of valid control cells. **[TODO: number]** fires were selected manually from this list by the authors, considering the agreement between dates, a clear dominant vegetation type and the coherence flag, and aiming at a balance between vegetation types and countries. The selection was recorded with its date in the project repository (`data/fires/selected_fires.csv`) before any time series was examined at fire locations. **[TODO: date of the selection; list of selected fires in Table S1]**
+**Selection.** A short list was built with all 2025 EFFIS perimeters larger than 2000 ha in the study area (53 perimeters; Table S1). Large fires were preferred because each covers several 0.05° cells. For each perimeter the short list gives the date of each source, the final ignition date, the coherence flag, the fuel-type and CORINE vegetation composition (Section 2.9), and the number of burned cells and of valid control cells. **[TODO: number]** fires were selected manually from this list by the authors, considering the agreement between dates, a clear dominant vegetation type and the coherence flag, and aiming at a balance between vegetation types and countries. The selection was recorded with its date in the project repository (`data/fires/selected_fires.csv`) before any time series was examined at fire locations. **[TODO: date of the selection; list of selected fires in Table S1]**
 
 ### 2.4. Data
 
@@ -63,7 +63,8 @@ The datasets used are listed in Table 1.
 | Active fires | NASA FIRMS VIIRS 375 m (S-NPP, NOAA-20, NOAA-21) | point | FIRMS | Schroeder et al. (2014) **[ref]** |
 | Burned area | MODIS MCD64A1 v061; VIIRS VNP64A1 v002 | 500 m, monthly | GEE | Giglio et al. (2018); **[ref]** |
 | Burned area (Spain) | ESFire30, Landsat 30 m annual perimeters, 1985–2025 | vector (30 m) | Zenodo, 10.5281/zenodo.20257001 | Ochoa et al. **[ref]** |
-| Land cover | CORINE Land Cover 2018 v20 | 100 m | GEE | EEA **[ref]** |
+| Fuel types | FirEUrisk European fuel map v2.0, first-level types (circa 2019) | 1 km | e-cienciaDatos, 10.21950/YABYCN | Aragoneses et al. (2023) |
+| Land cover (support) | CORINE Land Cover 2018 v20 | 100 m | GEE | EEA **[ref]** |
 | Aridity index | Global Aridity Index v3.1 (P/ET0, 1970–2000) | 30″ | figshare, 10.6084/m9.figshare.7504448.v7 | Zomer et al. (2022) |
 | Elevation | SRTM v4.1 (CGIAR-CSI) | 90 m | GEE | Jarvis et al. (2008) **[ref]** |
 
@@ -106,17 +107,17 @@ All series are masked from the masking date (the ignition date of the fire, incl
 
 ### 2.9. Burned and control cells
 
-**Vegetation.** CORINE Land Cover 2018 (100 m) was aggregated in GEE to the fraction of each 0.05° cell occupied by each of the following groups: broadleaved forest (311), coniferous forest (312), mixed forest (313), natural grassland (321), moors and heathland (322), sclerophyllous vegetation (323), transitional woodland-shrub (324), agricultural areas (211–242), agriculture with significant natural vegetation (243), agro-forestry (244), sparse vegetation (331–333), burnt areas (334), artificial surfaces and water bodies. The dominant group of a cell is the group with the largest fraction. Results are stratified into woodland (311–313), shrubland (322–324) and grassland (321); grassland is a negative control, because cured grasses are dead fuel whose physiology carries no information.
+**Vegetation.** Vegetation was described by the FirEUrisk European fuel map (Aragoneses et al., 2023), a 1 km map of first-level fuel types built from the Copernicus Global Land Cover 2019, ESA CCI Land Cover 2020 and CORINE 2018 maps and bioclimatic models of shrub and grass fuel depth. Fuel types describe the vegetation as fuel (canopy cover, fuel-bed depth), which is closer to the question than land-use classes. The map is in an equal-area projection (ETRS89-LAEA); each 1 km pixel was split into 4 × 4 sub-points, which were assigned to the 0.05° cell containing them, giving the area fraction of each fuel type per cell. The 20 mapped types were grouped into six classes plus nonfuel: closed forest (canopy cover ≥ 70%: broadleaf deciduous, needleleaf evergreen and mixed; types 1122, 1212, 1302), open forest (canopy cover 15–70%; 1121, 1211, 1301), shrubland (fuel depth classes 21–23), heathland and wet land (wet and peat/semi-peat land with trees, shrubs or grasses; 51–53), grassland (31–33), cropland (herbaceous and woody; 41, 42) and nonfuel (urban, water, bare soil and sparse vegetation; 61, 62, 7). Broadleaf evergreen forest (holm and cork oak) is not a separate type in the European product. The dominant class of a cell is the class with the largest fraction. Results are stratified into woodland (closed and open forest), shrubland (shrubland and heathland) and grassland; grassland is a negative control, because cured grasses are dead fuel whose physiology carries no information. CORINE Land Cover 2018 (100 m), aggregated in GEE to group fractions per 0.05° cell (forest types 311–313, natural grassland 321, heathland 322, sclerophyllous vegetation 323, transitional woodland-shrub 324, agricultural areas, agro-forestry and other groups), is reported alongside as support (Table S1) and used as an alternative classification in a sensitivity analysis (R18).
 
-**Burned cells.** The burned cells of a fire are the 0.05° cells of which at least 25% lies inside its perimeter. The fire's vegetation is the dominant group with the largest burned-fraction-weighted share among its burned cells.
+**Burned cells.** The burned cells of a fire are the 0.05° cells of which at least 25% lies inside its perimeter. The fire's vegetation is the dominant class with the largest burned-fraction-weighted share among its burned cells.
 
 **Control cells.** Three to five control cells per fire were selected once, for all variables. Each control must:
 - lie between 10 km and 50 km from the perimeter: the whole cell at least 10 km away, and its centre within 50 km. The immediate strip around the fire is never used, because the position of the fire edge depends on suppression, relief and firebreaks, not only on the state of the vegetation;
 - be unburned in every year from 2017 to the fire year: no burned area in EFFIS perimeters, in the MCD64A1 or VNP64A1 yearly burn history, or, in Spain, in the ESFire30 Landsat perimeters;
-- have the same dominant CORINE group as the fire;
-- have an aridity index within ±0.1, and a mean elevation (SRTM 90 m) within ±200 m, of the burned-fraction-weighted mean of the burned cells.
+- have the same dominant fuel class as the fire;
+- have an aridity index within ±15% (relative), and a mean elevation (SRTM 90 m) within ±200 m, of the burned-fraction-weighted mean of the burned cells. A relative aridity tolerance was preferred to an absolute one, which would be strict in the humid northwest (aridity index 1.5–2) and loose in semi-arid areas.
 
-Valid candidates are ranked by the sum of their elevation and aridity differences, each divided by its tolerance, and the five best are kept. Fires with fewer than three valid controls are excluded and the criteria are not relaxed. Of the 53 short-listed perimeters, 30 obtained at least three controls (Table S1).
+Valid candidates are ranked by the sum of their elevation and aridity differences, each divided by its tolerance, and the five best are kept. Fires with fewer than three valid controls are excluded and the criteria are not relaxed. Of the 53 short-listed perimeters, 37 obtained at least three controls (Table S1).
 
 ### 2.10. Superposed epoch analysis
 
@@ -128,9 +129,9 @@ where $z_c$ is the standardised anomaly of cell $c$, $B_f$ and $C_f$ are the bur
 
 **Lead time.** The lead time of a variable is the earliest day from which the mean difference stays at least 0.5 SD in the expected direction, with a confidence interval excluding zero, on every day up to day −1. The expected direction is negative for SIF/APAR, NDVI and EVI, and positive for FWI and AED. The same threshold is used for all variables. Because carrying the last fPAR composite forward biases SIF/APAR low if canopy structure declines before ignition, a lead time of SIF/APAR is accepted only if it is also found without fPAR persistence.
 
-**Information beyond the FWI.** To test whether SIF/APAR separates burned from control cells within comparable fire weather, the burned–control comparison of SIF/APAR is repeated within FWI danger classes (FWI of the burned cells over the same trailing window) **[TODO: implement; statistic, e.g. AUC of SIF/APAR within each FWI class]**.
+**Information beyond the FWI.** In this proof of concept, the information that SIF/APAR adds to the FWI is assessed descriptively. The burned–control differences of the FWI and of SIF/APAR (Eq. 6, both standardised) are shown together in the same figure for days −60 to −1. If the FWI differs little between burned and control cells while SIF/APAR does, SIF/APAR carries information on the pre-fire state that the fire weather does not. Because the FWI reference has a 0.25° resolution, some control cells within 10–50 km share the FWI value of the burned cells, which attenuates the FWI difference by construction; the FWI computed at 0.05° (R17) checks this. A formal test (discrimination of burned and control cells by SIF/APAR within FWI danger classes, e.g. the area under the ROC curve per class) requires more fires and is left for the full analysis.
 
-**Strata and decision criterion.** All results are given for all fires, by vegetation stratum and by country. The proof of concept is considered positive if SIF/APAR departs from the controls earlier than NDVI and EVI and discriminates within FWI classes, at least in shrubland and woodland.
+**Strata and decision criterion.** All results are given for all fires, by vegetation stratum and by country. The proof of concept is considered positive if, at least in shrubland and woodland, SIF/APAR departs from the controls earlier than NDVI and EVI, and SIF/APAR differs between burned and control cells on days when the FWI difference is small. **[TODO: woodland — decide whether the 2025 case includes it, depending on the number of woodland fires with controls]**
 
 **Ignition bias.** Fire occurrence also reflects human ignition patterns. Because fires were selected among those that did burn and are compared with matched unburned cells, results describe the pre-fire state of vegetation conditional on ignition, not the probability of ignition.
 
@@ -158,7 +159,8 @@ The analyses in Table 2 test whether the results depend on choices of the main a
 | R14 | NBAR indices | NDVI/EVI from MCD43A4 NBAR, masked from day −8 | BRDF-adjusted reference with a 16-day window |
 | R15 | Single platform | Terra and Aqua daily NDVI/EVI separately; Aqua − Terra difference by year | Orbital drift of both platforms since 2020–2021 |
 | R16 | High-confidence VIIRS | Ignition dates from high-confidence detections only | Sensitivity of the ignition date to the confidence class |
-| R17 | Own FWI at 0.05° | FWI computed from ERA5-Land at local noon | Spatial resolution of the fire weather reference |
+| R17 | Own FWI at 0.05° | FWI computed from ERA5-Land at local noon | Spatial resolution of the fire weather reference; the 0.25° FWI attenuates burned–control differences |
+| R18 | CORINE vegetation | Dominant CORINE 2018 group instead of the FirEUrisk fuel class for control matching and strata | Dependence on the vegetation classification |
 
 ### 2.12. Software and reproducibility
 
@@ -168,6 +170,7 @@ Gridded processing was implemented in Python 3.11 (xarray, NumPy, statsmodels, e
 
 ## References
 
+- Aragoneses, E., García, M., Salis, M., Ribeiro, L.M., Chuvieco, E., 2023. Classification and mapping of European fuels using a hierarchical, multipurpose fuel classification system. Earth Syst. Sci. Data 15, 1287–1315. https://doi.org/10.5194/essd-15-1287-2023 (data: v2.0, https://doi.org/10.21950/YABYCN)
 - Allen, R.G., Pereira, L.S., Raes, D., Smith, M., 1998. Crop evapotranspiration: guidelines for computing crop water requirements. FAO Irrigation and Drainage Paper 56. FAO, Rome.
 - Giglio, L., Boschetti, L., Roy, D.P., Humber, M.L., Justice, C.O., 2018. The Collection 6 MODIS burned area mapping algorithm and product. Remote Sens. Environ. 217, 72–85.
 - Gorelick, N., Hancher, M., Dixon, M., Ilyushchenko, S., Thau, D., Moore, R., 2017. Google Earth Engine: planetary-scale geospatial analysis for everyone. Remote Sens. Environ. 202, 18–27.
@@ -187,3 +190,4 @@ Gridded processing was implemented in Python 3.11 (xarray, NumPy, statsmodels, e
 - CEMS fire danger: 10.24381/cds.0e89c522.
 - ESFire30: 10.5281/zenodo.20257001.
 - Global Aridity Index v3.1: 10.6084/m9.figshare.7504448.v7.
+- FirEUrisk European fuel map v2.0: 10.21950/YABYCN.
