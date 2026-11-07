@@ -34,9 +34,11 @@ import argparse
 import datetime as dt
 import logging
 import time
+from pathlib import Path
 
 import ee
 import numpy as np
+import pandas as pd
 import xarray as xr
 
 from physiofire.config import REPO_ROOT, load_config
@@ -138,6 +140,10 @@ def fpar_images(gcfg: dict, start: dt.date, end: dt.date, product: str = "fpar")
 class ImplausibleValues(RuntimeError):
     """Raised when the median of a fetched image is outside the plausible range (likely a scaling error)."""
 
+    def __init__(self, msg: str, var: str | None = None, median: float | None = None, n_cells: int | None = None):
+        super().__init__(msg)
+        self.var, self.median, self.n_cells = var, median, n_cells
+
 
 def check_plausible(product: str, date, means: dict[str, np.ndarray], counts: dict[str, np.ndarray],
                     ranges: dict) -> dict[str, float]:
@@ -155,8 +161,27 @@ def check_plausible(product: str, date, means: dict[str, np.ndarray], counts: di
         medians[var] = med
         if not (lo <= med <= hi):
             raise ImplausibleValues(f"{product} {date}: median {var} = {med:.4g} outside plausible range "
-                                    f"[{lo}, {hi}] (check asset scaling)")
+                                    f"[{lo}, {hi}] (check asset scaling)", var, med, int(ok.sum()))
     return medians
+
+
+def check_negative_fraction(product: str, date, means: dict[str, np.ndarray], counts: dict[str, np.ndarray],
+                            max_fraction: float, min_pixels: int) -> float | None:
+    """Image-level check for atmospheric over-correction in daily surface reflectance: pooled fraction of screened
+    pixels with a negative reflectance in any band (band 'neg'). Raises ImplausibleValues if it exceeds max_fraction
+    and the image has at least min_pixels screened pixels (tiny clear areas are not judged). Returns the fraction."""
+    if "neg" not in means:
+        return None
+    ok = (counts["neg"] > 0) & np.isfinite(means["neg"])
+    n = float(counts["neg"][ok].sum())
+    if n < min_pixels:
+        return None
+    frac = float((means["neg"][ok] * counts["neg"][ok]).sum() / n)
+    if frac > max_fraction:
+        raise ImplausibleValues(f"{product} {date}: {100 * frac:.1f}% of {int(n)} screened pixels have a negative "
+                                f"reflectance (limit {100 * max_fraction:.0f}%; atmospheric over-correction)",
+                                "neg_fraction", frac, int(ok.sum()))
+    return frac
 
 
 def nbar_images(gcfg: dict, start: dt.date, end: dt.date) -> ee.ImageCollection:
@@ -180,8 +205,11 @@ def _bits(img: ee.Image, start: int, n: int) -> ee.Image:
 
 def sr_images(gcfg: dict, product: str, start: dt.date, end: dt.date) -> ee.ImageCollection:
     """Daily MOD09GA/MYD09GA red/NIR/blue surface reflectance (not BRDF-adjusted), screened for clouds,
-    shadows, cirrus, adjacency, snow, high aerosol, water, poor quality and view zenith (see config)."""
+    shadows, cirrus, adjacency, snow, high aerosol, water, poor quality and view zenith (see config).
+    With sr_reject_negative, 500 m pixels with a negative reflectance in any band are dropped (physically
+    impossible; seen in atmospheric over-correction, e.g. Terra 2025-03-29)."""
     vza_max = float(gcfg["sr_max_sensor_zenith"])
+    reject_negative = bool(gcfg.get("sr_reject_negative", False))
 
     def prep(img):
         st = img.select("state_1km")
@@ -191,8 +219,15 @@ def sr_images(gcfg: dict, product: str, start: dt.date, end: dt.date) -> ee.Imag
         good = _bits(img.select("QC_500m"), 0, 2).lte(1)
         vza = img.select("SensorZenith").multiply(0.01).lte(vza_max)
         ok = clear.And(good).And(vza)
-        bands = [img.select(b).multiply(0.0001).updateMask(ok).rename(k) for k, b in gcfg["sr_bands"].items()]
-        return ee.Image(bands).copyProperties(img, ["system:time_start"])
+        nonneg = ee.Image(1)
+        for b in gcfg["sr_bands"].values():
+            nonneg = nonneg.And(img.select(b).gte(0))
+        keep = ok.And(nonneg) if reject_negative else ok
+        bands = [img.select(b).multiply(0.0001).updateMask(keep).rename(k) for k, b in gcfg["sr_bands"].items()]
+        # fraction of screened pixels with a negative reflectance in any band (count = screened pixels):
+        # used for the image-level over-correction check (check_negative_fraction)
+        neg = nonneg.Not().toFloat().updateMask(ok).rename("neg")
+        return ee.Image(bands + [neg]).copyProperties(img, ["system:time_start"])
 
     return (ee.ImageCollection(gcfg[product]["collection"])
             .filterDate(str(start), str(end + dt.timedelta(days=1))).map(prep))
@@ -463,10 +498,44 @@ def _series_fetch_one(product: str, col: ee.ImageCollection, t: int, fine: Grid,
     return fetch(_to_grid(ee.Image(img), fine, max_pixels), fine)
 
 
+class RejectionLog:
+    """Images failing the plausibility check during a series download: logged to a CSV and excluded.
+    Raises ImplausibleValues (stopping the run) on a systematic problem: max_consecutive rejected images in a row
+    or more than max_per_year in one product-year. Rows for the same product and date are replaced on rerun."""
+
+    COLUMNS = ["product", "date", "variable", "median", "n_cells", "reason"]
+
+    def __init__(self, path, max_consecutive: int = 3, max_per_year: int = 5):
+        self.path, self.max_consecutive, self.max_per_year = path, int(max_consecutive), int(max_per_year)
+        self.start_year()
+
+    def start_year(self) -> None:
+        self.consecutive, self.n_year = 0, 0
+
+    def accept(self) -> None:
+        self.consecutive = 0
+
+    def reject(self, product: str, day: dt.date, err: ImplausibleValues) -> None:
+        self.consecutive += 1
+        self.n_year += 1
+        row = pd.DataFrame([{"product": product, "date": str(day), "variable": err.var, "median": err.median,
+                             "n_cells": err.n_cells, "reason": str(err)}], columns=self.COLUMNS)
+        if self.path is not None:
+            old = pd.read_csv(self.path) if Path(self.path).exists() else pd.DataFrame(columns=self.COLUMNS)
+            old = old[~((old["product"] == product) & (old["date"].astype(str) == str(day)))]
+            pd.concat([old, row], ignore_index=True).sort_values(["product", "date"]).to_csv(self.path, index=False)
+        log.warning("REJECTED %s (excluded; %d in a row, %d this year)", err, self.consecutive, self.n_year)
+        if self.consecutive >= self.max_consecutive or self.n_year > self.max_per_year:
+            raise ImplausibleValues(f"{product}: {self.consecutive} rejected images in a row, {self.n_year} this "
+                                    f"year (limits {self.max_consecutive} in a row, >{self.max_per_year} per year); "
+                                    f"last: {err}", err.var, err.median, err.n_cells)
+
+
 def run_series(cfg: dict, products: list[str], start: dt.date, end: dt.date, workers: int) -> None:
     """Full series, one file per product, grid and year in data/interim/gee/series/. Years whose files exist are
-    skipped (relaunch-safe). Images are fetched in parallel; each one passes the plausibility check, and the run
-    stops at the first implausible image (product and date in the log)."""
+    skipped (relaunch-safe). Images are fetched in parallel; an image failing the plausibility check is logged in
+    rejected_images.csv and excluded (no time step), and the run stops only on a systematic problem (see
+    RejectionLog and gee.series_rejection in the config)."""
     from concurrent.futures import ThreadPoolExecutor
 
     gcfg = cfg["gee"]
@@ -475,6 +544,11 @@ def run_series(cfg: dict, products: list[str], start: dt.date, end: dt.date, wor
     out_dir.mkdir(parents=True, exist_ok=True)
     ranges = gcfg.get("plausible_median", {})
     mx = int(gcfg["max_pixels"])
+    neg_max = float(gcfg.get("sr_max_negative_fraction", 1.0))
+    neg_min = int(gcfg.get("sr_negative_min_pixels", 0))
+    rcfg = gcfg.get("series_rejection", {})
+    rejections = RejectionLog(out_dir / rcfg.get("log_file", "rejected_images.csv"),
+                              rcfg.get("max_consecutive", 3), rcfg.get("max_per_year", 5))
     for product in products:
         # fPAR composites: margin so that daily interpolation covers the first and last days
         margin = dt.timedelta(days=8 if product == "fpar" else 0)
@@ -491,18 +565,31 @@ def run_series(cfg: dict, products: list[str], start: dt.date, end: dt.date, wor
             times = sorted(col.aggregate_array("system:time_start").getInfo())
             log.info("START %s %d: %d images (%s .. %s), %d workers", product, year, len(times), y0, y1, workers)
             results: dict[int, dict] = {}
+            rejections.start_year()
             with ThreadPoolExecutor(max_workers=workers) as ex:
                 futs = {ex.submit(_series_fetch_one, product, col, t, fine, mx): t for t in times}
-                for k, fut in enumerate(futs, 1):
+                for k, fut in enumerate(futs, 1):   # submission order = time order ("in a row" is in time)
                     t = futs[fut]
                     a = fut.result()
                     day = dt.datetime.utcfromtimestamp(t / 1000).date()
                     base = {kk.rsplit("_", 1)[0] for kk in a}
-                    check_plausible(product, day, {v: a[f"{v}_mean"] for v in base},
-                                    {v: a[f"{v}_count"] for v in base}, ranges)
+                    means, counts = {v: a[f"{v}_mean"] for v in base}, {v: a[f"{v}_count"] for v in base}
+                    try:
+                        check_negative_fraction(product, day, means, counts, neg_max, neg_min)
+                        check_plausible(product, day, means, counts, ranges)
+                    except ImplausibleValues as err:
+                        try:
+                            rejections.reject(product, day, err)
+                        except ImplausibleValues:
+                            for f in futs:
+                                f.cancel()
+                            raise
+                        continue
+                    rejections.accept()
                     results[t] = {kk: v.astype("f4") for kk, v in a.items()}
                     if k % 50 == 0:
                         log.info("  %s %d: %d/%d images", product, year, k, len(times))
+            times = [t for t in times if t in results]   # rejected images are excluded
             layers: dict[str, list] = {}
             for t in times:
                 for kk, v in results[t].items():
@@ -521,8 +608,8 @@ def run_series(cfg: dict, products: list[str], start: dt.date, end: dt.date, wor
                         out_dir=out_dir)
             for g in cfg["grids"]:
                 (out_dir / f"{product}_{g}_{y0:%Y%m%d}_{y1:%Y%m%d}.nc").replace(out_dir / tag.format(g=g))
-            log.info("DONE %s %d: %d images in %.0f min, throttling hits this year: %d", product, year, len(times),
-                     (time.time() - t0) / 60, RATE_LIMIT_HITS["n"] - hits0)
+            log.info("DONE %s %d: %d images in %.0f min, rejected: %d, throttling hits this year: %d", product, year,
+                     len(times), (time.time() - t0) / 60, rejections.n_year, RATE_LIMIT_HITS["n"] - hits0)
 
 
 def check_file(path: str, ranges: dict) -> None:
@@ -586,11 +673,51 @@ def run_burn_history(cfg: dict, y0: int, y1: int) -> None:
         log.info("wrote %s", out.relative_to(REPO_ROOT))
 
 
+def run_burn_dates(cfg: dict, product: str, start: dt.date, end: dt.date) -> None:
+    """Monthly burned-area burn dates (MCD64A1 or VNP64A1) at ~native resolution (nearest neighbour on a
+    gee.burn_date_res_deg lat/lon grid; no aggregation), for dating fires inside perimeters.
+    Output: data/interim/gee/burndate/{product}_burndate_{start:%Y%m}_{end:%Y%m}.nc with, per month,
+    burn_date (days since 1970-01-01; NaN = not burned/unmapped) and burn_date_uncertainty (days)."""
+    gcfg = cfg["gee"]
+    pc = gcfg["burn_date_products"][product]
+    r = cfg["region"]
+    grid = Grid(r["lon_min"], r["lat_min"], r["lon_max"], r["lat_max"], float(gcfg["burn_date_res_deg"]))
+    col = ee.ImageCollection(pc["collection"]).filterDate(str(start.replace(day=1)), str(end + dt.timedelta(days=1)))
+    times = sorted(col.aggregate_array("system:time_start").getInfo())
+    dates, unc, months = [], [], []
+    for t in times:
+        m = dt.datetime.utcfromtimestamp(t / 1000).date()
+        img = ee.Image(col.filter(ee.Filter.eq("system:time_start", t)).first())
+        doy = img.select(pc["date_band"])
+        out = ee.Image([doy.updateMask(doy.gt(0)).unmask(0).rename("doy"),
+                        img.select(pc["uncertainty_band"]).updateMask(doy.gt(0)).unmask(0).rename("unc")])
+        a = fetch(out.toInt16(), grid)
+        jan1 = (dt.date(m.year, 1, 1) - dt.date(1970, 1, 1)).days
+        dates.append(np.where(a["doy"] > 0, jan1 + a["doy"] - 1, np.nan).astype("f4"))
+        unc.append(np.where(a["doy"] > 0, a["unc"], np.nan).astype("f4"))
+        months.append(np.datetime64(m, "ns"))
+        log.info("%s %s: %d burned pixels", product, m.strftime("%Y-%m"), int((a["doy"] > 0).sum()))
+    ds = xr.Dataset({"burn_date": (("month", "lat", "lon"), np.stack(dates)),
+                     "burn_date_uncertainty": (("month", "lat", "lon"), np.stack(unc))},
+                    coords={"month": months, "lat": grid.lat, "lon": grid.lon})
+    ds["burn_date"].attrs = {"long_name": f"burn date ({pc['date_band']})", "units": "days since 1970-01-01"}
+    ds["burn_date_uncertainty"].attrs = {"long_name": pc["uncertainty_band"], "units": "days"}
+    ds.attrs = {"source": pc["collection"], "resolution_deg": grid.res,
+                "resampling": "nearest neighbour from native sinusoidal 500 m (computePixels)"}
+    out_dir = REPO_ROOT / gcfg["out_dir"] / "burndate"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    f = out_dir / f"{product}_burndate_{start:%Y%m}_{end:%Y%m}.nc"
+    enc = {v: {"zlib": True, "complevel": 4} for v in ds.data_vars}
+    ds.to_netcdf(f, encoding=enc)
+    log.info("wrote %s", f.relative_to(REPO_ROOT))
+
+
 def main(argv=None) -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("product", choices=["fpar", "fpar_viirs", "nbar", "mod09ga", "myd09ga", "landcover", "mask",
                                        "shortwave", "shortwave_monthly_1deg", "burned", "burn_history", "check",
-                                       "series"])
+                                       "series", "burn_dates"])
+    p.add_argument("--burn-product", choices=["mcd64a1", "vnp64a1"], help="for 'burn_dates'")
     p.add_argument("--file", help="for 'check': NetCDF written by this module to re-check against plausible ranges")
     p.add_argument("--products", nargs="+", default=SERIES_PRODUCTS, help="for 'series': products in priority order")
     p.add_argument("--workers", type=int, default=8, help="for 'series': simultaneous requests")
@@ -617,6 +744,8 @@ def main(argv=None) -> None:
             log.error("STOPPED by plausibility check: %s", e)
             raise
         log.info("SERIES FINISHED; total throttling hits: %d", RATE_LIMIT_HITS["n"])
+    elif args.product == "burn_dates":
+        run_burn_dates(cfg, args.burn_product, args.start, args.end)
     elif args.product == "burn_history":
         y0, y1 = cfg["gee"]["burn_history_years"]
         run_burn_history(cfg, int(y0), int(y1))

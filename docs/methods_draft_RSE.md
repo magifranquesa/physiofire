@@ -145,6 +145,9 @@ EVI values outside [0, 1] were discarded. 0.25° indices were obtained as count-
 
 We therefore add a daily, non-BRDF-adjusted NDVI/EVI from MODIS surface reflectance (MOD09GA, Terra, and MYD09GA, Aqua; collection 6.1, in GEE), processed separately for each platform.
 - **Screening:** `state_1km` flags for clear sky, no cloud shadow, no cirrus, no internal cloud, not adjacent to cloud, no snow and not high aerosol **[TODO: verify bit definitions in the MOD09 user guide]**; `QC_500m` MODLAND quality ≤ 1; sensor zenith ≤ 40°.
+- **Physically impossible values:** 500 m pixels with a negative reflectance in any band are discarded **[Implemented]**.
+- **Image-level rejection:** a whole daily image is rejected if more than 10% of its screened pixels have a negative reflectance in any band (only for images with at least 10,000 screened pixels, about 2500 km²). This is the signature of atmospheric over-correction, which lowers all bands and inflates NDVI; discarding only the negative pixels leaves the rest of the image biased low. Images whose median red, NIR or blue reflectance over valid cells falls outside a plausible range (red 0.01–0.40, NIR 0.05–0.60, blue 0.005–0.30) are also rejected. Rejected images are logged and excluded **[Implemented]**.
+  - Over May 2018 – November 2026 (about 3100 images per platform), only one image was rejected: Terra, 29 March 2025. On that day, 25.7% of 1.16 million screened pixels were negative. Median red reflectance was 0.037 and NIR 0.18, against 0.085–0.096 and 0.29–0.31 on the adjacent days. No other image with substantial clear coverage exceeded 4.6% negative pixels. **[Update with the final rejected_images.csv once the series is complete]**
 - **Aggregation:** to the same grids.
 - **Role:** main optical competitor in the lead-time analysis, with MCD43A4 as a secondary reference.
 
@@ -243,11 +246,29 @@ Daily anomalies of SIF/APAR, SIF/PAR, NDVI, EVI, AED and FWI will be computed fo
 - EFFIS perimeters for Spain and Portugal, which use a homogeneous method and are also used to cross-check perimeters and dates;
 - **[TODO: Portuguese fire map source]**.
 
-**Ignition dates.** The ignition date of each fire will be confirmed by at least two sources: map date, earliest VIIRS active-fire detection within the perimeter (NASA FIRMS, S-NPP and NOAA-20), and national ignition records (EGIF, ICNF) where accessible. EFFIS dates may refer to detection, and nearby perimeters may be merged; both cases will be checked against FIRMS.
+**Active fires [Implemented].** VIIRS 375 m active-fire detections (NASA FIRMS archive; S-NPP, NOAA-20 and NOAA-21; standard processing to July 2026 and near-real-time afterwards) and MODIS C6.1 detections as a backup. Detections on islands are removed with the peninsula mask. In the standard archive, only detections flagged as presumed vegetation fires are kept (`type` = 0; static land sources and offshore detections removed). The near-real-time files carry no type flag, so detections within 500 m (VIIRS) or 1000 m (MODIS) of any static-source detection of the 2018–2026 standard archive are removed by position. VIIRS low-confidence detections are dropped (MODIS confidence < 30); a high-confidence-only variant is a sensitivity test.
+
+**EFFIS perimeters [Implemented].** EFFIS burnt-area perimeters are mapped from MODIS at 250 m for fires of about 30 ha or larger. They were downloaded from the public real-time database on 7 November 2026 and kept for mainland Spain and Portugal, 2018–2026. EFFIS start dates (`FIREDATE`) are not independent of the active-fire record: in 2025, the EFFIS start time matched the first VIIRS detection inside the perimeter within 10 minutes for 60% of perimeters with VIIRS detections. Some start times are also assigned in batches at round hours. Agreement between EFFIS and FIRMS therefore does not count as independent confirmation.
+
+**Ignition dates [Implemented].** In the main analysis the epoch is aligned on ignition, and all cells of a fire are masked from the ignition date onwards (Section 2.11). An error in the ignition date therefore has asymmetric consequences:
+- **Late date (dangerous):** days after the true ignition stay in the "pre-fire" window. Burning, smoke and early vegetation damage would then appear as a precursor signal, producing a spurious lead time.
+- **Early date (conservative):** only removes a few genuine pre-fire days. This slightly shortens the usable window and can, at worst, underestimate the lead time.
+
+The rule therefore takes the **earliest** of four estimates, each restricted to the perimeter and to the window [$\mathrm{FIREDATE} - 30$ d, $\mathrm{FINALDATE} + 1$ d]:
+- the EFFIS `FIREDATE`;
+- the first VIIRS detection (cleaned as above);
+- the first MCD64A1 burn date (Collection 6.1, 500 m, monthly, per-pixel day of burning);
+- the first VNP64A1 burn date (VIIRS burned area, Collection 2, 500 m, monthly; in GEE from March 2012 to September 2026).
+
+Burn dates are taken at native resolution (nearest neighbour on a 0.005° grid, pixel centres inside the perimeter) and compared at daily (UTC) resolution. The source(s) that determine the date are recorded. Because the burned-area products carry a per-pixel date uncertainty and the rule takes the minimum over all pixels, it tends to place ignition one to two days before `FIREDATE`. For perimeters of 500 ha or more in 2025, the final date was earlier than `FIREDATE` in 71 of 108 cases, by one or two days in 49 of them. This is the intended, conservative direction.
+
+**Coherence flag [Implemented].** A perimeter is flagged, and in principle excluded, if VIIRS detections or MCD64A1/VNP64A1 burn dates occur inside it between 90 and 30 days before `FIREDATE`. Such activity indicates merged perimeters or an earlier fire, which would contaminate the pre-fire window. The 90-day lookback covers the 30-day dating window plus the 60-day epoch window. The amount of prior activity (counts and fractions of detections and burned pixels) is stored with the flag. Ignitions more than 3 days before `FIREDATE` that are not flagged are marked for manual review (possible merging within the dating window).
+- In 2025, 7 of 108 perimeters of 500 ha or more are flagged, including 5 of the 25 largest (≥ 5000 ha). In all 7 the prior activity consists of one to eleven VIIRS detections, against hundreds to thousands within the fire. **[TODO: decide whether a minimum magnitude of prior activity is required before excluding; criterion to be fixed before the analysis]**
+- National ignition records (EGIF through ESFire30, 2018–2021) are an optional validation **[backlog]**.
 
 **Selection.** Fires will be selected manually but according to written criteria, fixed and versioned before any vegetation time series is examined at fire locations:
 - a minimum area **[TODO]**, prioritising large fires given the 0.25° scale; the fraction of the 0.25° and 0.05° cells burned will be recorded;
-- a confirmed ignition date;
+- an ignition date assigned by the rule above and no coherence flag;
 - a clear dominant vegetation type;
 - no overlap with other fires within the 60-day pre-fire window;
 - **[Planned]** a minimum number of valid seasons before the fire in each of its cells, so that the climatology is defined **[TODO: number, e.g. 3 seasons with ≥ x% valid days]**;

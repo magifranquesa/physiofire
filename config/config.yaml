@@ -75,6 +75,10 @@ gee:
     red: [0.01, 0.40]
     nir: [0.05, 0.60]
     blue: [0.005, 0.30]
+  series_rejection:           # full-series download: an image failing plausible_median is logged and excluded;
+    log_file: rejected_images.csv   # (in the series folder) the run stops only on a systematic problem:
+    max_consecutive: 3        # this many rejected images in a row (likely scaling), or
+    max_per_year: 5           # more than this many in one product-year
   nbar:
     collection: MODIS/061/MCD43A4   # MCD43C4 is not in the GEE catalogue; MCD43A4 (500 m) aggregated instead
     bands: {red: Nadir_Reflectance_Band1, nir: Nadir_Reflectance_Band2, blue: Nadir_Reflectance_Band3}
@@ -89,6 +93,10 @@ gee:
     sw_band: surface_solar_radiation_downwards_sum   # J m-2 per day
   burned:
     collection: MODIS/061/MCD64A1   # QC point screening; yearly burn history (fraction, first burn date)
+  burn_date_products:               # monthly burned area, per-pixel burn date (day of year) for ignition dating
+    mcd64a1: {collection: MODIS/061/MCD64A1, date_band: BurnDate, uncertainty_band: Uncertainty}
+    vnp64a1: {collection: NASA/VIIRS/002/VNP64A1, date_band: Burn_Date, uncertainty_band: Burn_Date_Uncertainty}
+  burn_date_res_deg: 0.005          # ~500 m native, nearest-neighbour on a lat/lon grid (no aggregation)
   burn_history_years: [2013, 2025]  # 5 years before the TROPOMI record (2018) to the latest case
   # Daily surface reflectance, NOT BRDF-adjusted: main optical competitor in the epoch analysis.
   # state_1km bits (MOD09 user guide, to verify): 0-1 cloud state (0 clear), 2 cloud shadow, 3-5 land/water
@@ -96,6 +104,10 @@ gee:
   # 15 internal snow mask. QC_500m bits 0-1 MODLAND QA (0 ideal, 1 less than ideal).
   sr_bands: {red: sur_refl_b01, nir: sur_refl_b02, blue: sur_refl_b03}
   sr_max_sensor_zenith: 40
+  sr_reject_negative: true    # MOD09GA/MYD09GA: drop 500 m pixels with negative reflectance in any band
+  sr_max_negative_fraction: 0.10   # reject the whole image if more screened pixels than this are negative
+  sr_negative_min_pixels: 10000    # ... and it has at least this many screened 500 m pixels (~2500 km2)
+                                   # 2018-2026: only Terra 2025-03-29 (24.7%); next largest with coverage 4.6%
   mod09ga:
     collection: MODIS/061/MOD09GA   # Terra; overpass drifting earlier (~09:00 by late 2025)
   myd09ga:
@@ -181,6 +193,44 @@ sample_period:            # task 4: end-to-end SIF/APAR chain test (60-day windo
 fires:
   first_case_year: 2025
   candidate_years: [2018, 2019, 2020, 2021, 2022, 2023, 2024]
+
+# Active-fire detections (FIRMS archive download, one request per country; see docs/data_sources.md)
+firms:
+  raw_dir: data/raw/firms              # {spain,portugal}/DL_FIRE_{source}_{id}/fire_{archive,nrt}_*.csv
+  out_dir: data/interim/firms
+  viirs_sources: [SV-C2, J1V-C2, J2V-C2]   # S-NPP, NOAA-20, NOAA-21 (375 m)
+  modis_source: M-C61                  # MODIS C6.1 (1 km), backup only
+  keep_type: 0                         # standard archive: 0 = presumed vegetation fire (2 = static land source, 3 = offshore)
+  viirs_drop_confidence: [l]           # VIIRS classes l/n/h: drop low only (high-only = sensitivity test, backlog)
+  modis_min_confidence: 30             # MODIS 0-100: < 30 = low
+  static_type: 2                       # NRT files have no 'type': mask built from archive type-2 detections ...
+  static_buffer_m_viirs: 500           # ... buffered by this distance for VIIRS NRT detections
+  static_buffer_m_modis: 1000          # ... and this for MODIS NRT detections
+  peninsula_mask: data/interim/gee/mask_peninsula_fine.nc   # land_fraction > 0 keeps mainland cells (islands out)
+
+# EFFIS burnt area perimeters (public "real-time updated" database, MODIS 250 m, fires of ~30 ha or more)
+effis:
+  url: https://forest-fire.emergency.copernicus.eu/downloads/data.request.form/effis_layer.zip
+  raw_dir: data/raw/effis/20261107     # download date (database is updated twice a day)
+  layer: effis_layer/modis.ba.poly.shp
+  countries: [ES, PT]
+  years: [2018, 2026]
+  out_dir: data/interim/fires
+
+# Ignition date of each perimeter (R/fire_candidates.R). A late date is the dangerous error (post-ignition data
+# would enter the pre-fire window), so ignition = EARLIEST of: EFFIS FIREDATE, first VIIRS detection (cleaned
+# FIRMS), first MCD64A1 and first VNP64A1 burn date, each inside the perimeter and within
+# [FIREDATE - ignition_window_before_days, FINALDATE + ignition_window_after_days].
+# Coherence flag (exclude in principle): any VIIRS detection or MCD64A1/VNP64A1 burn date inside the perimeter in
+# [FIREDATE - prior_lookback_days, FIREDATE - ignition_window_before_days) = possible merged perimeters or earlier
+# fire. prior_lookback_days = 30 + 60-day epoch window, so the whole pre-ignition window is checked.
+ignition:
+  sources: [effis, viirs, mcd64a1, vnp64a1]
+  ignition_window_before_days: 30
+  ignition_window_after_days: 1
+  prior_lookback_days: 90
+  review_early_days: 3       # marker only (manual review): ignition more than this many days before FIREDATE
+  burn_date_dir: data/interim/gee/burndate   # {product}_burndate_*.nc (python -m physiofire.download.gee burn_dates)
 
 # Selection criteria: to be fixed (and documented in docs/fire_selection_criteria.md)
 # BEFORE looking at SIF/APAR. null = pending decision.

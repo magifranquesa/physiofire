@@ -31,6 +31,15 @@ Cada entrada indica qué se prueba, contra qué referencia y dónde está descri
 | 16 | Umbral del efecto distinto de 0,5 desviaciones típicas | 0,5 DE | 2.11 |
 | 17 | Cobertura del suelo del año anterior a cada incendio | mapa fijo de 2017 | 2.12 |
 | 18 | FWI propio con ERA5-Land a mediodía a 0,05° | FWI de CEMS a 0,25° | 2.9 |
+| 20 | Fecha de ignición con detecciones VIIRS de confianza alta solamente | confianza nominal y alta (sin la baja) | 2.10 |
+| 21 | Validación de la máscara de fuentes estáticas: construida con `type = 2` de 2018–2024 y evaluada con el archivo estándar de 2025–2026 (aciertos y detecciones `type = 0` eliminadas por error) | — | 2.10 |
+| 22 | Validación de la fecha de ignición con la EGIF (vía ESFire30), 2018–2021 | regla de la fecha más temprana | 2.10 |
+
+## Prueba completa (después del caso 2025)
+
+| # | Tarea | Motivo | Borrador |
+| --- | --- | --- | --- |
+| 23 | Reglas automáticas de selección de incendios: superficie mínima, marca de coherencia con un mínimo de actividad previa (p. ej. ≥ 5 % de las detecciones VIIRS o algún píxel quemado de MCD64A1/VNP64A1), vegetación dominante, solape, temporadas válidas y sin quemas en los 5 años anteriores | El caso 2025 usa una selección manual de 10–15 grandes incendios (decidido el 7 de noviembre de 2026) | 2.10 |
 
 ## Versión operativa (después de la prueba de concepto)
 

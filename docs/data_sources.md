@@ -250,6 +250,139 @@ MODIS tiene además el estado de nubes heredado de MOD09 en `FparLai_QC` (bits 3
 - Las dos versiones de MODIS (con y sin estado de nubes) dan prácticamente lo mismo.
 - **Conclusión:** VIIRS da un fPAR mucho más estable, pero en SIF/APAR la mejora es modesta (≈ 10 % en arbolado a 0,25° y menos en el resto), porque domina el ruido de la SIF.
 
+## Reflectancia diaria MOD09GA/MYD09GA: píxeles negativos e imágenes rechazadas (7 de noviembre de 2026)
+
+**Qué pasó.** La descarga de la serie completa se detuvo en Terra (MOD09GA) el 29 de marzo de 2025. La mediana del azul en la Península era 0,0049, por debajo del límite de 0,005.
+
+**El fallo era del día, no de escala.** Las tres bandas eran anormalmente bajas en la mitad occidental de la Península, la única despejada ese día:
+
+| Día (Terra) | Rojo | IRC | Azul | Píxeles despejados con alguna banda negativa |
+| --- | --- | --- | --- | --- |
+| 28/03/2025 | 0,085 | 0,288 | 0,041 | 0,01 % |
+| **29/03/2025** | **0,037** | **0,183** | **0,006** | **25,7 %** |
+| 30/03/2025 | 0,096 | 0,310 | 0,046 | 0,0 % |
+
+- Es probablemente una sobrecorrección atmosférica (la mediana del 29 de marzo está calculada ya sin los píxeles negativos).
+- Si se aceptara, daría un NDVI falsamente alto (≈ 0,68 frente a ≈ 0,54).
+
+**Frecuencia de píxeles negativos en toda la serie** (mayo de 2018 – noviembre de 2026, recuadro de la región, a 1 km, calculado en GEE con un script exploratorio no versionado):
+
+| | MOD09GA (Terra) | MYD09GA (Aqua) |
+| --- | --- | --- |
+| Imágenes | 3097 | 3093 |
+| Percentil 99 de la fracción de píxeles negativos | 0,3 % | 1,0 % |
+| Imágenes > 10 % | 3 | 2 |
+
+- El 29 de marzo de 2025 es el único caso con cobertura apreciable: 25,7 % de 1,16 millones de píxeles de 500 m despejados.
+- Las otras imágenes por encima del 10 % tienen menos de 350 km² despejados (invierno).
+- La siguiente imagen con cobertura amplia es Aqua del 2 de noviembre de 2026, con un 4,1 %.
+
+**Filtros aplicados** (`config.yaml`, sección `gee`):
+1. **Píxel** (`sr_reject_negative`): se descarta el píxel de 500 m con reflectancia negativa en cualquier banda.
+2. **Imagen** (`sr_max_negative_fraction`, `sr_negative_min_pixels`): se rechaza la imagen entera si más del 10 % de sus píxeles despejados tiene alguna banda negativa, siempre que tenga al menos 10 000 píxeles despejados (unos 2500 km²).
+   - El filtro de píxel por sí solo no basta: sin los negativos, el 29 de marzo pasa la comprobación de medianas (azul 0,0062), pero el día sigue sesgado.
+   - Los archivos guardan la fracción de negativos por celda (variable `neg`; `neg_count` = píxeles despejados).
+3. **Rangos plausibles de la mediana** (`plausible_median`): sin cambios.
+
+**Imágenes rechazadas** (`series_rejection`):
+- Una imagen que no pasa los filtros 2 o 3 se anota en `data/interim/gee/series/rejected_images.csv` (producto, fecha, variable, valor, número de celdas y motivo).
+- Se excluye: no aparece como paso de tiempo en el archivo anual.
+- La descarga sigue. Solo se detiene con 3 rechazos seguidos o más de 5 en un mismo producto y año, porque eso indicaría un problema sistemático (escala).
+- **Rechazada hasta ahora:** MOD09GA, 29 de marzo de 2025.
+
+**Serie homogénea.** MOD09GA 2018–2024 se descarga de nuevo con los mismos filtros. Los archivos anteriores, sin el filtro de negativos, están en `data/interim/gee/series/backup_mod09ga_nofilter/` hasta comprobar los nuevos; luego se borran.
+
+## FIRMS: archivo descargado y limpieza (7 de noviembre de 2026)
+
+**Descarga.** Petición en https://firms.modaps.eosdis.nasa.gov/download/ con la cuenta de Earthdata, una por país (España y Portugal; el formulario no admite varios a la vez).
+- Parámetros: buffer de 0 km, del 1 de enero de 2018 al 7 de noviembre de 2026, CSV.
+- Fuentes: VIIRS S-NPP (`SV-C2`), NOAA-20 (`J1V-C2`), NOAA-21 (`J2V-C2`) y MODIS C6.1 (`M-C61`).
+- Cada fuente viene en dos partes: estándar (`fire_archive_*`, hasta el 31 de julio de 2026; MODIS, hasta finales de agosto) y tiempo casi real (`fire_nrt_*`, hasta el 2–7 de noviembre de 2026). Las dos partes empalman sin huecos.
+- La selección por país incluye las islas: Canarias y Baleares en España, Azores y Madeira en Portugal.
+- En `data/raw/firms/{spain,portugal}/`, 45 MB.
+
+**Campos.** `latitude`, `longitude`, `brightness`, `scan`, `track`, `acq_date`, `acq_time` (UTC, HHMM), `satellite`, `instrument`, `confidence`, `version`, `bright_t31`, `frp`, `daynight` y, solo en la parte estándar, `type`.
+- `type`: 0 = presunto incendio de vegetación, 2 = otra fuente terrestre estática, 3 = en el mar.
+- `confidence`: en VIIRS, clases `l`, `n` y `h` (baja, nominal y alta); en MODIS, de 0 a 100.
+
+**Limpieza** ([R/firms_clean.R](../R/firms_clean.R), sección `firms` de `config.yaml`):
+1. **Solo la Península:** se conservan las celdas de la máscara peninsular con `land_fraction > 0`, lo que deja fuera las islas.
+2. **Parte estándar:** se conserva solo `type = 0`.
+3. **Parte en tiempo casi real (sin `type`):** se eliminan las detecciones a menos de 500 m (VIIRS) o 1000 m (MODIS) de alguna detección `type = 2` del archivo estándar de 2018–2026. Elimina un 15–16 %, una proporción parecida a la de `type = 2` en el archivo estándar (≈ 18 %). La validación fuera de muestra está en el backlog (21).
+4. **Confianza:** en VIIRS se quita solo la baja; en MODIS, los valores < 30. La prueba solo con confianza alta está en el backlog (20).
+
+**Resultado:** `data/interim/firms/firms_iberia_clean.csv`, con 425 154 detecciones (VIIRS más MODIS), y su resumen por fuente.
+
+**Agosto de 2025, comprobación cualitativa.** En el noroeste (lat > 41,5°, lon < −6°) las detecciones VIIRS diarias pasan de ≈ 40 el 7–8 de agosto a > 1100 desde el 10, con un máximo de 7244 el 17 de agosto.
+
+## Perímetros de EFFIS (verificado el 7 de noviembre de 2026)
+
+**Acceso.** Hay dos vías, según la página https://forest-fire.emergency.copernicus.eu/applications/data-and-services:
+- **Descarga pública directa** de la base de datos de áreas quemadas, actualizada en tiempo real:
+  - Shapefile: https://forest-fire.emergency.copernicus.eu/downloads/data.request.form/effis_layer.zip (262 MB; descargado el 7 de noviembre de 2026, versión de las 03:46 UTC).
+  - SpatiaLite: `effis_layer.db.zip`.
+- **Formulario de solicitud** (https://forest-fire.emergency.copernicus.eu/apps/data.request.form) para "datos históricos, extractos de la base de datos o perímetros brutos". No ha hecho falta: la descarga directa trae todos los años.
+
+**Licencia.** © Unión Europea, 1995–2026. Se permite la reutilización citando la fuente (Decisión de la Comisión de 12 de diciembre de 2011).
+
+**Contenido** (`effis_layer/modis.ba.poly.shp`, WGS84). 109 262 perímetros de toda el área de EFFIS.
+- **Fechas:** `FIREDATE` (fecha y hora de inicio, UTC), `FINALDATE` y `LASTUPDATE`.
+- **Localización y superficie:** `COUNTRY` (ES, PT…), `PROVINCE`, `COMMUNE` y `AREA_HA`.
+- **Cobertura afectada:** porcentajes de CORINE en `BROADLEA`, `CONIFER`, `MIXED`, `SCLEROPH`, `TRANSIT`, `OTHERNATLC`, `AGRIAREAS`, `ARTIFSURF` y `OTHERLC`.
+- **Otros:** `PERCNA2K` (porcentaje en Natura 2000) y `CLASS` (`FireSeason`, `30DAYS` o `7DAYS`).
+
+**Advertencias del readme:**
+- Los perímetros salen de MODIS a 250 m y se dibujan para incendios de unas 30 ha o más, aunque hay perímetros más pequeños.
+- Pueden incluir quemas agrícolas o prescritas.
+- Incendios distintos entre dos actualizaciones pueden quedar fusionados en un solo perímetro.
+- "Las fechas de inicio y de última actualización pueden no corresponder a la ignición y la extinción del incendio".
+
+**Recorte** ([R/effis_firms_dates.R](../R/effis_firms_dates.R)). España y Portugal, año de `FIREDATE` de 2018 a 2026, con el punto interior del perímetro dentro de la máscara peninsular.
+
+| Año | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ES | 102 | 418 | 466 | 897 | 1484 | 1389 | 758 | 1355 | 2149 |
+| PT | 86 | 217 | 462 | 746 | 1230 | 921 | 737 | 998 | 1434 |
+
+- Superficie total de 2025: España ≈ 399 000 ha y Portugal ≈ 283 000 ha.
+- Salida en `data/interim/fires/effis_iberia_2018_2026.gpkg`.
+
+**Fecha de EFFIS frente a la primera detección VIIRS** (2025; `data/interim/fires/effis_2025_firms_dates.csv` y su resumen):
+- **Método:** para cada perímetro, se toma la primera detección VIIRS (`type = 0`, confianza no baja) dentro del perímetro, entre `FIREDATE` − 30 días y `FINALDATE` + 1 día. La ventana es exploratoria, no un criterio de selección.
+- **Cobertura de VIIRS:** el 100 % de los perímetros de ≥ 500 ha tiene detecciones VIIRS dentro; los de < 100 ha, solo el 33 %.
+- **Coincidencia:** la mediana de la diferencia es 0 días en todas las clases de tamaño.
+  - En el 60 % de los perímetros con VIIRS, la hora de inicio de EFFIS coincide con la primera detección VIIRS con menos de 10 minutos de diferencia (63 de 108 en los de ≥ 500 ha).
+  - **Por tanto, la fecha de inicio de EFFIS se deriva de las detecciones activas: EFFIS y FIRMS no son dos fuentes independientes de la fecha.**
+- **Discrepancias de más de 1 día:** 14 de los 108 perímetros de ≥ 500 ha tienen VIIRS antes y 4 después.
+  - VIIRS antes (hasta 28 días): probablemente un incendio anterior dentro del mismo perímetro o perímetros fusionados (por ejemplo, Oímbra, Ourense: VIIRS el 24 de julio y EFFIS el 13 de agosto).
+  - VIIRS después (2–3 días): por ejemplo, Piódão y Ferreira de Aves (Portugal). Las horas de EFFIS acaban en :00 en el 18 % de los perímetros y se repiten en lotes (2025-03-31 00:00 en 58 perímetros; 2025-08-10 02:00 en varios grandes), lo que apunta a fechas asignadas por lote y no observadas.
+
+**Consecuencia (decidido el 7 de noviembre de 2026).** Ya no se exigen dos fuentes independientes. La fecha de ignición es la más temprana entre EFFIS, VIIRS, MCD64A1 y VNP64A1, porque el error peligroso es una fecha tardía. La regla y su justificación están en el borrador de métodos (2.10); la validación con la EGIF (ESFire30, 2018–2021) queda en el backlog (22).
+
+## Área quemada para la fecha de ignición: MCD64A1 y VNP64A1 (7 de noviembre de 2026)
+
+- **VNP64A1 está en GEE** ✅: `NASA/VIIRS/002/VNP64A1` (colección 2), mensual, 500 m, 175 imágenes de marzo de 2012 a septiembre de 2026.
+  - Bandas: `Burn_Date` (día del año), `Burn_Date_Uncertainty`, `QA`, `First_Day` y `Last_Day`.
+  - No hay versión 001 en GEE.
+- **MCD64A1:** `MODIS/061/MCD64A1`, de noviembre de 2000 a agosto de 2026. Bandas: `BurnDate`, `Uncertainty`, `QA`, `FirstDay` y `LastDay`.
+- **Descarga** (`python -m physiofire.download.gee burn_dates --burn-product {mcd64a1,vnp64a1} --start --end`):
+  - Fecha de quemado por píxel, por vecino más próximo en una rejilla de 0,005° (≈ 500 m), sin agregar.
+  - En `data/interim/gee/burndate/`. Descargado de octubre de 2024 a enero de 2026 para los candidatos de 2025.
+- **Comprobación:** en agosto de 2025 hay ≈ 25 000 celdas quemadas en cada producto (≈ 570 000 ha), del mismo orden que la superficie de EFFIS de ese mes.
+
+**Tabla de candidatos de 2025** ([R/fire_candidates.R](../R/fire_candidates.R); `data/interim/fires/fire_candidates_2025.csv`):
+
+| Tamaño | Perímetros | Fecha más temprana anterior a EFFIS | Más de 1 día antes | Con marca de coherencia | Para revisar (> 3 días antes, sin marca) |
+| --- | --- | --- | --- | --- | --- |
+| < 100 ha | 2093 | 24 | 19 | 16 | 18 |
+| 100–500 ha | 152 | 36 | 19 | 3 | 9 |
+| 500–1000 ha | 29 | 15 | 10 | 2 | 3 |
+| 1000–5000 ha | 54 | 38 | 20 | 0 | 8 |
+| ≥ 5000 ha | 25 | 18 | 9 | 5 | 4 |
+
+- **Diferencia con EFFIS por fuente** (mediana, perímetros de ≥ 500 ha): VIIRS 0 días, MCD64A1 −1 día, VNP64A1 0 días.
+- **Marcados de ≥ 500 ha:** los 7 lo están por entre 1 y 11 detecciones VIIRS entre 90 y 30 días antes, frente a cientos o miles dentro del incendio. Ninguno por MCD64A1 ni VNP64A1.
+
 ## Pendiente para la serie completa
 
 - Repetir por año la comparación Aqua − Terra del NDVI diario (MYD09GA − MOD09GA), para detectar efectos de la deriva orbital. En la muestra de 2025 la diferencia mediana es −0,001.
