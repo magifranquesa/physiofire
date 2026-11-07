@@ -26,9 +26,10 @@ Cada entrada indica qué se prueba, contra qué referencia y su código en la ta
 | 26 | NDVI/EVI de NBAR (MCD43A4), enmascarado desde el día −8 | NDVI/EVI diario de MOD09GA/MYD09GA | R14 |
 | 2 | Terra y Aqua por separado; diferencia Aqua − Terra del NDVI diario por año y hora media de paso por año (deriva orbital) | — | R15 |
 | 20 | Fecha de ignición con detecciones VIIRS de confianza alta solamente | confianza nominal y alta | R16 |
-| 18 | FWI propio con ERA5-Land a mediodía a 0,05°. Además de la resolución: con el FWI de 0,25°, parte de los controles a 10–50 km comparten celda de FWI con las celdas quemadas, lo que reduce por construcción la diferencia incendio–control del FWI | FWI de CEMS a 0,25° | R17 |
+| 18 | FWI operativo de CEMS (ERA5, 0,25°) como referencia. El 7–16 % de los controles de los 24 incendios comparte celda de 0,25° con alguna celda quemada (0 % a 0,1°), lo que reduce por construcción la diferencia incendio–control del FWI. Desde el 7 de noviembre de 2026, el FWI propio con ERA5-Land a 0,1° es el del análisis principal | FWI propio con ERA5-Land a 0,1° | R17 |
 | 31 | Vegetación de CORINE 2018 (grupo dominante) para emparejar controles y estratificar. Diagnóstico ya hecho con la lista corta: 35 de 53 incendios con controles (1 de arbolado), frente a 37 (2 de arbolado) con FirEUrisk | clase dominante de FirEUrisk | R18 |
 | 16 | Umbral del efecto distinto de 0,5 desviaciones típicas | 0,5 DE | — |
+| 36 | Sin los incendios con una sola celda quemada (Alburquerque, 278487, y Lazarim, 281621, en 2025) | los 22 incendios | R19 |
 
 ## Comprobaciones de datos
 
@@ -45,6 +46,7 @@ Cada entrada indica qué se prueba, contra qué referencia y su código en la ta
 | --- | --- | --- | --- |
 | 23 | Reglas automáticas de selección de incendios: superficie mínima, marca de coherencia con un mínimo de actividad previa (p. ej. ≥ 5 % de las detecciones VIIRS o algún píxel quemado de MCD64A1/VNP64A1), vegetación dominante, solape, temporadas válidas y sin quemas en los 5 años anteriores | El caso 2025 usa una selección manual (decidido el 7 de noviembre de 2026) | 2.3 |
 | 28 | Regresión logística condicional (FWI + AED + NDVI frente a + SIF/APAR) con conjuntos caso-control emparejados y bootstrap por episodios | Información más allá del FWI con más incendios | — |
+| 35 | Estrato de arbolado: incendios de arbolado de otros años (2018–2024) o de menos de 2000 ha, con el mismo diseño de controles | En 2025 solo 2 de los 5 incendios de arbolado de la lista corta tenían controles; el caso 2025 se limita a matorral (decidido el 7 de noviembre de 2026) | 2.3, 2.10 |
 | 32 | Discriminación incendio–control de SIF/APAR dentro de cada clase de peligro del FWI (AUC por clase, umbrales de clase de EFFIS) | Sustituida en el caso 2025 por la comparación descriptiva FWI frente a SIF/APAR (decidido el 7 de noviembre de 2026); hacen falta más incendios por clase | 2.10 |
 
 ## Líneas futuras (fuera de la prueba de concepto)

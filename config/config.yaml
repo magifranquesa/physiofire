@@ -178,7 +178,17 @@ epoch:
   # extracted for the fires.
   window_days: 60          # days before ignition (day 0 = ignition date; days -60 .. -1 analysed)
   grids: [fine]            # 0.05 deg is the main (only) scale of the proof of concept; 0.25 deg -> backlog
-  selected_fires: data/fires/selected_fires.csv   # columns: fire_id (= EFFIS id), ignition_date, ...
+  selected_fires: data/fires/selected_fires.csv   # columns: fire_id (= EFFIS id), ignition_date, ... (R/select_fires.R)
+  selection:               # fire sample by rule (decided 2026-11-07; replaces the manual selection)
+    strata: [shrubland]    # woodland -> full analysis (only 2 of 5 woodland fires had controls in 2025)
+    rule: "shortlist (EFFIS > 2000 ha); stratum shrubland; valid ignition date; no coherence flag; >= 3 controls"
+    # General exclusion (decided 2026-11-07): ignition more than this many days before the EFFIS FIREDATE without
+    # independent confirmation. The satellite dates (VIIRS, MCD64A1, VNP64A1) are searched inside the same EFFIS
+    # perimeter, so they cannot rule out a merged perimeter or an earlier fire inside it; confirmation needs an
+    # independent record (e.g. EGIF, ICNF, ESFire30 MODIS-dated perimeters), which is not implemented: all such
+    # fires are excluded (exclude = TRUE, reason below).
+    max_days_before_effis: 7
+    early_ignition_reason: "Ignición > 7 días antes de EFFIS sin confirmación independiente: ventana previa posiblemente desalineada"
   burned_min_fraction: {fine: 0.25}               # burned cell: fraction of the cell inside the perimeter
   controls:                # per fire, compared with the (burned-fraction weighted) mean of its burned cells
     n_min: 3               # fewer valid candidates -> fire reported without controls (no relaxation)

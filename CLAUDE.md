@@ -41,7 +41,7 @@ Responder a una pregunta para decidir si seguir:
 2. Información más allá del FWI: en la misma figura, diferencia incendio–control del FWI y de SIF/APAR (comparación descriptiva). Si el FWI es parecido entre incendios y controles y SIF/APAR difiere, es evidencia de valor añadido. El AUC dentro de cada clase de FWI, en la prueba completa.
 3. Todo estratificado por tipo de vegetación (matorral, arbolado y pasto como control negativo) y por país.
 
-**Criterio de decisión:** seguir si SIF/APAR se adelanta al NDVI/EVI y difiere entre incendios y controles cuando la diferencia del FWI es pequeña, al menos en matorral y arbolado (el arbolado, si hay incendios con controles suficientes; ver "Decisiones tomadas"). Si no, replantear (otra resolución, SIF/PAR, otra región) antes de invertir más. Un resultado negativo también es publicable.
+**Criterio de decisión:** seguir si SIF/APAR se adelanta al NDVI/EVI y difiere entre incendios y controles cuando la diferencia del FWI es pequeña, al menos en matorral y arbolado. El caso 2025 evalúa solo matorral; el arbolado, en la prueba completa (ver "Decisiones tomadas").
 
 **Fuera de alcance por ahora:** réplica de la correlación cruzada de Tang, ESI/GLEAM, LFMC, modelo predictivo, bajada de escala, sistema operativo, visor y FLEX.
 
@@ -59,7 +59,7 @@ Responder a una pregunta para decidir si seguir:
 - **Alternativa y complemento: perímetros de EFFIS.** Para grandes incendios son muy precisos, cubren España y Portugal con el mismo método e incluyen fecha. Si la cartografía de Ochoa no llega a 2025, usar EFFIS. Aunque llegue, EFFIS sirve para contrastar perímetros y fechas. Ojo: la fecha de EFFIS puede ser la de detección y los perímetros de incendios cercanos pueden aparecer fusionados; contrastar con FIRMS.
 - **Portugal:** cartografía de incendios disponible (fuente concreta a confirmar con el investigador).
 - **Fecha de inicio:** imprescindible para el análisis. Si una cartografía no la incluye, asignarla cruzando cada perímetro con la primera detección de FIRMS VIIRS y, si es posible, con la EGIF (España) o el ICNF (Portugal) **(verificar)**.
-- **Selección manual.** La cartografía tiene incertidumbre, así que se seleccionan incendios a mano, pero con criterios escritos **antes** de mirar SIF/APAR:
+- **Selección** (caso 2025: por regla, ver "Decisiones tomadas"). La cartografía tiene incertidumbre, así que la selección se hace con criterios escritos **antes** de mirar SIF/APAR:
   - superficie mínima (a fijar; priorizar grandes incendios por la escala de 0,25°);
   - fecha confirmada por al menos dos fuentes;
   - vegetación dominante clara;
@@ -76,8 +76,8 @@ Responder a una pregunta para decidir si seguir:
 - **Robustez:** datos de AEMET disponibles en el grupo (que trabaja con AEMET) para repetir el análisis en España con meteorología de mayor calidad.
 - **AED (demanda evaporativa atmosférica):** variable atmosférica del análisis, en lugar del VPD. Integra temperatura, humedad, viento y radiación. Estimarla como evapotranspiración de referencia (ET0) con FAO-56 Penman-Monteith a partir de la fuente meteorológica elegida. Preguntar antes al investigador: su grupo (IPE, con AEMET) puede tener ya la AED calculada, y su método prevalece.
 - Nota: Tang et al. usan VPD, así que la comparación con su artículo no es directa; documentarlo en la discusión.
-- **FWI propio:** calcularlo con el sistema canadiense. Verificar que los datos tienen valores a mediodía de temperatura, humedad relativa y viento, y precipitación de 24 h.
-- **FWI de referencia:** el de EFFIS / Copernicus EMS, porque es la referencia operativa que el índice tendría que mejorar. Nombre exacto del dataset **(verificar)**.
+- **FWI propio (análisis principal, decidido el 7 de noviembre de 2026):** sistema canadiense con ERA5-Land a 0,1° (valores a mediodía de temperatura, humedad relativa y viento, y precipitación de 24 h), con una implementación existente (propuesta pendiente de aprobar por el investigador). Motivo: con el FWI de 0,25°, el 7–16 % de los controles comparte celda con las celdas quemadas (0 % a 0,1°), lo que sesga la comparación a favor de SIF/APAR.
+- **FWI de referencia:** el de EFFIS / Copernicus EMS, como referencia operativa y prueba de sensibilidad. Nombre exacto del dataset **(verificar)**.
 
 ## Base científica: Tang et al. (2026)
 
@@ -221,13 +221,14 @@ Stack: Python 3.11 (`environment.yml`) con xarray, dask, rioxarray, zarr, netCDF
 
 ## Decisiones tomadas (7 de noviembre de 2026)
 
-- **Caso 2025:** selección manual de 10–15 incendios de la lista corta de EFFIS > 2000 ha (`docs/fire_shortlist_2025.md`), guardada con fecha antes de analizar. Las reglas automáticas, para la prueba completa (backlog).
+- **Caso 2025:** en lugar de una selección manual, todos los incendios de la lista corta de EFFIS > 2000 ha del estrato matorral (matorral y brezal) con fecha de ignición válida, sin marca de coherencia y con ≥ 3 controles (`Rscript R/select_fires.R` → `data/fires/selected_fires.csv`). Regla general de exclusión: ignición más de 7 días antes de la fecha de EFFIS sin confirmación independiente (`epoch.selection.max_days_before_effis`). Muestra final: 22 incendios (24 menos Oímbra y Murias de Paredes); exclusiones a mano solo con motivo registrado.
 - **Fecha de ignición:** la más temprana entre EFFIS, VIIRS, MCD64A1 y VNP64A1 (el error peligroso es una fecha tardía).
 - **Escala:** 0,05°. **Anomalías:** mediana por día del año; LOESS como sensibilidad.
 - **Umbrales** (en `config.yaml`, sección `epoch`): celda quemada ≥ 25 %; controles 3–5 por incendio, a 10–50 km, 0 % quemado desde 2017 (EFFIS, MCD64A1, VNP64A1 y ESFire30), misma clase dominante de FirEUrisk, aridez ±15 % (relativa al índice de las celdas quemadas) y altitud ±200 m; antelación = primer día desde el que el efecto se mantiene ≥ 0,5 DE hasta el día −1.
 - **Vegetación:** mapa de combustibles de FirEUrisk agrupado en bosque cerrado, bosque abierto, matorral, brezal y zonas húmedas, pastizal, cultivos y sin combustible (`config.yaml`, `epoch.fuel.classes`); estratos: arbolado = bosque cerrado o abierto, matorral = matorral o brezal, pasto = pastizal. CORINE 2018 como apoyo. **Aridez:** Global-AI v3.1. **PAR:** ERA5-Land. **LOESS:** tendencia ajustada antes del día −60, como sensibilidad. **ESFire30:** desde 2017 hasta el año del incendio.
 - **Información más allá del FWI:** comparación descriptiva (diferencia incendio–control del FWI y de SIF/APAR en la misma figura); el AUC por clase de FWI, a la prueba completa.
-- **Arbolado:** se decide con la lista regenerada con FirEUrisk; si sigue sin controles suficientes, el caso 2025 se centra en matorral y el arbolado pasa a la prueba completa.
+- **Arbolado:** pasa a la prueba completa (backlog 35); en 2025 solo 2 de los 5 incendios de arbolado tenían controles. El caso 2025 se centra en el estrato matorral.
+- **FWI:** el propio (ERA5-Land, 0,1°) pasa al análisis principal; el de EFFIS/CEMS, a sensibilidad (R17).
 - **Nieve:** sin máscara específica en el caso 2025 (ventanas de junio a agosto); GlobSnow, al backlog.
 
 ## Decisiones pendientes con el investigador
