@@ -423,6 +423,70 @@ aed:
   inputs_dir: data/interim/era5land_aed
   out_dir: data/interim/era5land_aed
 
+# Question 1 (pre-registered 2026-11-08; docs/plan_q1_drought.md): does SIF/APAR respond to water stress at shorter
+# time-scales and earlier than NDVI/EVI in Iberian natural vegetation, independently of fires? Fixed before any
+# reference download, SPEI or series extraction; no parameter changes after results (post-hoc = additional analysis).
+drought_q1:
+  period: ["2018-05-01", "2025-12-31"]
+  cells:
+    grid: fine
+    min_land_fraction: 0.5
+    fuel_classes: [closed_forest, open_forest, shrubland, wet_heath, grassland]   # dominant FirEUrisk class
+    unburned_since: 2013   # any burned area since this year by MCD64A1, VNP64A1, EFFIS (from 2018) or ESFire30 -> out
+  strata:
+    shrubland: [shrubland, wet_heath]   # DECIDES the result; wet_heath also reported alone (descriptive)
+    forest: [closed_forest, open_forest]   # reported in the same detail, does not decide
+    grassland: [grassland]               # reference
+  aridity_classes: {semiarid: [0.0, 0.5], dry_subhumid: [0.5, 0.65], humid: [0.65, 100]}   # Global-AI v3.1
+  vegetation:
+    main: [sif_apar, ndvi, evi]        # ndvi/evi = Terra + Aqua combined
+    secondary: [sif, sif_par, fpar]    # descriptive only
+    fpar_interpolation: centred        # linear between composites, no persistence (no cut-off date here)
+    screening: same_as_sif_apar        # sif_apar.screening (fPAR >= 0.15, PAR >= 40, weight >= 0.1) and spike_k = 6
+  anomalies:
+    method: median_doy                 # +- anomalies.clim_doy_window days, climatology 2018-2025
+    smooth_days: 15                    # centred mean, same for all variables
+    smooth_min_frac: 0.5
+    standardise: whole_period_sd       # SD of the smoothed anomaly of each cell over the whole period
+  spei:
+    scales_days: [15, 30, 60, 90, 180, 365]
+    reference: [1991, 2020]
+    distribution: log-logistic         # unbiased PWM; one fit per day of year; 29 February removed
+    package: SPEI 1.8.1 (R, CRAN)      # checked on synthetic data before use (plan)
+    grid: native_era5land_0.1          # 0.05 deg cells take the containing 0.1 deg cell
+    precip_source: ECMWF/ERA5_LAND/HOURLY total_precipitation_hourly   # sum of the 24 hours of the UTC day
+    et0: fao56_era5land                # physiofire.preprocess.aed
+    precip_dir: data/interim/era5land_precip
+    out_dir: data/interim/spei
+  aed_secondary: true                  # AED (ET0) anomaly as secondary explanatory variable in analysis 1
+  analysis1:
+    months: [4, 5, 6, 7, 8, 9, 10]     # vegetation day t in April-October; all years pooled
+    lags_days: [0, 60]
+    correlation: pearson
+    permutations: 199                  # whole-year permutation of the vegetation series; max over scales x lags
+    alpha: 0.05
+    h1_min_fraction: 0.60              # SIF/APAR scale shorter (strictly) than NDVI and than EVI
+    h2_scale_days: 90
+    h2_max_median_lag_diff_days: -5    # median L(SIF/APAR) - L(NDVI or EVI) <= -5, CI entirely below 0
+    bootstrap_block_deg: 1.0
+  analysis2:
+    spei_scale_days: 90
+    onset_threshold: -1.0
+    min_duration_days: 30
+    pre_days: 60
+    pre_threshold: -0.5
+    onset_months: [3, 4, 5, 6, 7, 8, 9]
+    response_window_days: [-30, 90]    # relative to onset (decided 2026-11-08: responses before the SPEI-90 crossing)
+    response_threshold_sd: -0.5
+    response_min_days: 15
+    event_max_onset_gap_days: 15       # 8-neighbour connected cells with onsets within +- this
+    event_min_cells: 10
+    h3_max_median_diff_days: -5        # median over events of median(SIF/APAR - NDVI or EVI) <= -5, CI below 0
+  bootstrap_n: 2000
+  decision: "positive if H3 and (H1 or H2) in the shrubland stratum, each against NDVI and against EVI"
+  out_dir: data/processed/drought_q1
+  fig_dir: figures/drought_q1
+
 random_seed: 42
 
 paths:

@@ -65,6 +65,28 @@ Cada entrada indica qué se prueba, contra qué referencia y su código en la ta
 | 29 | Réplica de la correlación cruzada de Tang (tiempos de respuesta frente a VPD y humedad del suelo) | Ya fuera de alcance en CLAUDE.md |
 | 30 | Media móvil centrada de 15 días × 3 × 3 de Tang en los mapas descriptivos | Solo para figuras comparables con el artículo |
 
+## Fase predictiva: opción A (registrada el 8 de noviembre de 2026)
+
+Es una fase futura. Se detalla y se fija, con su criterio de decisión, solo después del resultado de la pregunta 1 (`docs/plan_q1_drought.md`) y antes de entrenar ningún modelo.
+
+- **Unidad:** celda de 0,05° × día, temporadas de junio a octubre de 2018–2025, en matorral, brezal y arbolado (FirEUrisk).
+- **Variable objetivo:** la celda arde en los próximos 1–7, 8–14 o 15–28 días (perímetros de EFFIS y fecha de quemado por celda: primera detección VIIRS o MCD64A1/VNP64A1).
+- **Predictores**, solo con información disponible ese día y con las latencias reales de cada producto:
+  - anomalías de FWI, SPEI (escala según el resultado de la pregunta 1), NDVI/EVI y AED;
+  - variables fijas: combustible, aridez y altitud;
+  - indicadores de presencia humana: distancia a carreteras y a núcleos de población **(fuente a decidir y verificar)**.
+- **Muestreo:** todos los casos con incendio y una muestra amplia de días sin incendio, con pesos de muestreo.
+- **Modelos:** base (FWI + SPEI + NDVI + variables fijas) frente a base + SIF/APAR; regresión logística o GAM.
+- **Validación:** dejando fuera años completos y bloques regionales.
+- **Métricas:** ΔAUC, Brier skill score y fiabilidad. El criterio de decisión se fija antes de entrenar.
+- **Variante:** solo incendios grandes, donde el combustible pesa más.
+- **Pendiente de concretar entonces:**
+  - fecha de quemado por celda y su incertidumbre;
+  - tratamiento de las celdas quemadas en la temporada (fuera del riesgo tras arder);
+  - latencias: ERA5-Land unos 5 días, TROPOSIF, MODIS;
+  - tamaño de la muestra sin incendio y pesos;
+  - fuente de las variables de presencia humana.
+
 ## Versión operativa (después de la prueba de concepto)
 
 | # | Tarea | Motivo |

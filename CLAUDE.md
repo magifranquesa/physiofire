@@ -25,9 +25,20 @@ Evaluar si el estado fisiológico de la vegetación observado desde satélite pe
 
 **Para qué sirve el resultado:** un artículo con el investigador como autor de correspondencia (envío hacia mayo–junio de 2027), resultados preliminares para una beca MSCA postdoctoral (cierre habitual en septiembre de 2027) y un resumen para la EGU (plazo habitual en enero de 2027).
 
-## Objetivo de la prueba de concepto (prioridad absoluta)
+## Objetivo actual: pregunta 1 (prioridad absoluta desde el 8 de noviembre de 2026)
 
-Responder a una pregunta para decidir si seguir:
+> ¿SIF/APAR detecta el estrés hídrico antes y a escalas más cortas que el NDVI/EVI en la vegetación natural de la Península, con independencia de los incendios?
+
+- Plan prerregistrado: `docs/plan_q1_drought.md` y `config.yaml` (sección `drought_q1`), fijados en git antes de calcular nada.
+- Celdas de 0,05° de vegetación natural sin quemar desde 2013, en 2018–2025.
+- SPEI diario de 15 a 365 días (ERA5-Land, referencia 1991–2020) y AED como variable secundaria.
+- Análisis 1: escala y desfase de máxima correlación. Análisis 2: respuesta en episodios de sequía.
+- Criterio de decisión: positivo si se cumplen H3 y además H1 o H2 en matorral (matorral + brezal), frente al NDVI y frente al EVI. El bosque se informa y el pastizal es referencia.
+- Es una pregunta previa a la predicción de incendios: su resultado fija la escala del SPEI del modelo base de la fase predictiva (opción A, en `docs/backlog.md`).
+
+## Prueba de concepto con incendios (caso 2025 cerrado: resultado negativo)
+
+Resultado en `docs/results_case2025.md`: SIF/APAR no se separa de los controles. La señal previa en las celdas quemadas (FWI, AED, SIF/APAR) es regional y la comparten los controles. Pregunta original:
 
 > ¿La anomalía de SIF/APAR se separa de lo normal antes de los incendios, con más antelación que el NDVI/EVI, y aporta información que el FWI no tiene?
 
@@ -43,7 +54,10 @@ Responder a una pregunta para decidir si seguir:
 
 **Criterio de decisión:** seguir si SIF/APAR se adelanta al NDVI/EVI y difiere entre incendios y controles cuando la diferencia del FWI es pequeña, al menos en matorral y arbolado. El caso 2025 evalúa solo matorral; el arbolado, en la prueba completa (ver "Decisiones tomadas").
 
-**Fuera de alcance por ahora:** réplica de la correlación cruzada de Tang, ESI/GLEAM, LFMC, modelo predictivo, bajada de escala, sistema operativo, visor y FLEX.
+**Fuera de alcance por ahora:**
+- réplica de la correlación cruzada de Tang (la pregunta 1 es un análisis propio, no una réplica);
+- ESI/GLEAM (salvo el contraste de la AED, backlog 37), LFMC, bajada de escala, sistema operativo, visor y FLEX;
+- modelo predictivo: registrado como fase futura (opción A, `docs/backlog.md`), que se detalla y se fija solo después del resultado de la pregunta 1.
 
 **Hitos:**
 
