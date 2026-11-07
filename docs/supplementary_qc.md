@@ -148,3 +148,14 @@ Synthetic daily series (seasonal cycle plus Gaussian noise, January 2019 – Sep
 | FWI | 1.7 | 0.66 |
 
 The FFMC difference has a single origin. xclim keeps the coefficient 147.2 of the original equations (Van Wagner, 1987) in the conversion between FFMC and fine fuel moisture content (Eqs. 1 and 10), whereas cffdrs uses 147.27723 (= 250 × 59.5/101), introduced in the revised official code (Wang et al., 2015). With the cffdrs coefficient set to 147.2, the maximum differences fall to 1.1 × 10⁻⁵ (FFMC) and 5 × 10⁻⁵ (FWI), i.e. storage precision. xclim was used unmodified; the difference does not affect any decision of the 2025 case, because anomalies are standardised per cell. Script: `R/check_fwi_cffdrs.R`.
+
+**Comparison with the CEMS fire danger reanalysis.** The FWI computed from ERA5-Land (0.1°, continuous from 1 January 2017) was compared with the operational CEMS reanalysis (`cems-fire-historical-v1`, version 4_1, consolidated, ERA5, 0.25°) for August 2025, after averaging the 0.1° cells within each 0.25° cell (1,283 cells with ≥ 50% land; 39,773 cell-days). Script: `python -m physiofire.preprocess.fwi_cems_compare`.
+
+| Index | r (pooled) | Bias (ERA5-Land − CEMS) | MAE | Median ERA5-Land / CEMS | r of the monthly mean (spatial) | Median temporal r per cell |
+| --- | --- | --- | --- | --- | --- | --- |
+| FWI | 0.986 | −1.6 | 2.4 | 38.5 / 39.8 | 0.986 | 0.991 |
+| FFMC | 0.991 | −0.1 | 0.7 | 92.9 / 93.0 | 0.988 | 0.995 |
+| DMC | 0.969 | +6.0 | 19.0 | 162 / 160 | 0.974 | 0.990 |
+| DC | 0.996 | +0.8 | 15.3 | 761 / 759 | 0.996 | 1.000 |
+
+The two products agree closely; ERA5-Land gives a slightly lower FWI (−4% in the median). With a start-up on 1 January 2025 instead of 2017, the DC was 29 units lower than CEMS in August 2025 (r = 0.978), so the long spin-up matters for the moisture codes. Within each 0.25° cell, the 0.1° cells differ by a median SD of 8 FWI units in August 2025 (regional SD 12), mostly through the moisture codes (DC: 67 against 134), whereas the same-day noon inputs vary little inside a 0.25° cell (temperature 0.4 °C, relative humidity 1%, wind 0.6 km h⁻¹). Part of the 0.1° variability therefore comes from the accumulated precipitation history, which ERA5-Land interpolates from ERA5 (Section 2.7).
