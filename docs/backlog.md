@@ -24,7 +24,6 @@ Cada entrada indica qué se prueba, contra qué referencia y su código en la ta
 | 3 | PAR de CERES SYN1deg Ed4B y prueba del salto de abril de 2022 (mensual, rejilla de 1°). Ya no condiciona el análisis principal, que usa ERA5-Land | PAR de ERA5-Land | R12 |
 | 6 | Ponderación de la SIF por el inverso de la varianza de cada píxel | ponderación por huella | R13 |
 | 26 | NDVI/EVI de NBAR (MCD43A4), enmascarado desde el día −8 | NDVI/EVI diario de MOD09GA/MYD09GA | R14 |
-| 2 | Terra y Aqua por separado; diferencia Aqua − Terra del NDVI diario por año y hora media de paso por año (deriva orbital) | — | R15 |
 | 20 | Fecha de ignición con detecciones VIIRS de confianza alta solamente | confianza nominal y alta | R16 |
 | 18 | FWI operativo de CEMS (ERA5, 0,25°) como referencia. El 7–16 % de los controles de los 24 incendios comparte celda de 0,25° con alguna celda quemada (0 % a 0,1°), lo que reduce por construcción la diferencia incendio–control del FWI. Desde el 7 de noviembre de 2026, el FWI propio con ERA5-Land a 0,1° es el del análisis principal | FWI propio con ERA5-Land a 0,1° | R17 |
 | 31 | Vegetación de CORINE 2018 (grupo dominante) para emparejar controles y estratificar. Diagnóstico ya hecho con la lista corta: 35 de 53 incendios con controles (1 de arbolado), frente a 37 (2 de arbolado) con FirEUrisk | clase dominante de FirEUrisk | R18 |
@@ -76,6 +75,7 @@ Cada entrada indica qué se prueba, contra qué referencia y su código en la ta
 
 | Fecha | Prueba | Motivo |
 | --- | --- | --- |
+| 2026-11-08 | 2 (R15): Terra y Aqua por separado | Con una sola plataforma hay pocos días válidos: Terra o Aqua tienen dato el 10–44 % de los días de mayo–agosto de 2025 en las celdas de incendios y controles, y la media de 15 días exige la mitad de días válidos (solo el 4–21 % de las medias de Terra fueron válidas). La diferencia Aqua − Terra por año (deriva orbital) queda como comprobación de datos si hace falta |
 | 2026-11-07 | 9: contraste de MCD12C1 con CORINE o WorldCover | MCD12C1 deja de usarse; la vegetación sale de CORINE 2018 |
 | 2026-11-07 | 17: cobertura del suelo del año anterior a cada incendio (MCD12C1) | Igual; CORINE 2018 es un mapa único anterior a los incendios de 2025 (ver 27) |
 

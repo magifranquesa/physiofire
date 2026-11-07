@@ -23,7 +23,7 @@ ec <- cfg$epoch
 args <- commandArgs(trailingOnly = TRUE)
 if (!length(args)) stop("usage: Rscript R/epoch_analysis.R <anomalies.csv> [cells.csv] [fires.csv] [out_dir] [fig_dir]")
 out_dir <- if (length(args) >= 4) args[4] else file.path(root, ec$out_dir)
-fig_dir <- if (length(args) >= 5) args[5] else file.path(root, cfg$paths$figures, "epoch")
+fig_dir <- if (length(args) >= 5) args[5] else file.path(cfg$paths$figures, "epoch")   # cfg$paths already absolute
 cells_csv <- if (length(args) >= 2) args[2] else file.path(out_dir, "epoch_cells.csv")
 fires_csv <- if (length(args) >= 3) args[3] else file.path(root, ec$selected_fires)
 dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)

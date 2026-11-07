@@ -3,6 +3,16 @@ data/*
 !data/fires/
 data/fires/*
 !data/fires/selected_fires.csv
+# Results of the 2025 case (small tables; the long series epoch_series_*.csv and epoch_fire_days.csv are regenerable)
+!data/processed/
+data/processed/*
+!data/processed/epoch/
+data/processed/epoch/*
+!data/processed/epoch/epoch_cells.csv
+!data/processed/epoch/epoch_cells_status.csv
+!data/processed/epoch/epoch_effects_*.csv
+!data/processed/epoch/epoch_lead_times.csv
+!data/processed/epoch/report2025_*.csv
 
 # Regenerable quick-look figures
 figures/qc/
