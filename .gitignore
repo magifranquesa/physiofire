@@ -45,3 +45,11 @@ __pycache__/
 Thumbs.db
 desktop.ini
 .vscode/
+!data/processed/drought_q1/
+data/processed/drought_q1/*
+!data/processed/drought_q1/hypotheses.csv
+!data/processed/drought_q1/decision.json
+!data/processed/drought_q1/analysis2_episodes.csv
+!data/processed/drought_q1/summary_*.csv
+!data/processed/drought_q1/posthoc_events.csv
+!data/processed/drought_q1/posthoc_par_diagnostic.csv

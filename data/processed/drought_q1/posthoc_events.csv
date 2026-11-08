@@ -1,0 +1,12 @@
+event,stratum,n_cells,onset_first,onset_last,n_resp_sif_apar,n_resp_ndvi,n_resp_evi,n_resp_sif,n_resp_sif_par,n_resp_fpar,n_pairs_sif_apar_ndvi,n_pairs_sif_apar_evi,onset_month,posthoc
+44,grassland,4,2023-03-13,2023-03-13,3,3,1,3,4,4,2,0,3,True
+44,shrubland,7,2023-03-13,2023-03-13,3,7,2,6,6,7,3,0,3,True
+52,forest,6,2023-03-13,2023-03-13,2,5,5,4,4,4,2,2,3,True
+52,grassland,4,2023-03-13,2023-03-13,2,4,4,4,3,4,2,2,3,True
+52,shrubland,25,2023-03-13,2023-03-13,18,25,25,24,24,25,18,18,3,True
+123,grassland,3,2025-08-21,2025-08-21,2,0,0,1,1,0,0,0,8,True
+123,shrubland,7,2025-08-21,2025-08-21,4,0,0,1,1,0,0,0,8,True
+139,grassland,4,2022-08-02,2022-08-02,3,0,0,4,3,0,0,0,8,True
+139,shrubland,11,2022-08-02,2022-08-02,9,0,0,7,7,1,0,0,8,True
+145,grassland,7,2022-08-02,2022-08-02,4,0,0,4,3,0,0,0,8,True
+145,shrubland,17,2022-08-02,2022-08-02,6,1,0,5,4,6,0,0,8,True
