@@ -452,7 +452,9 @@ drought_q1:
     scales_days: [15, 30, 60, 90, 180, 365]
     reference: [1991, 2020]
     distribution: log-logistic         # unbiased PWM; one fit per day of year; 29 February removed
-    package: SPEI 1.8.1 (R, CRAN)      # checked on synthetic data before use (plan)
+    package: SPEI 1.8.1 (R, CRAN)      # checked on synthetic data before use (R/tests/test_spei.R)
+    inf_clamp: null                    # DECISION PENDING: SPEI outside the support of the fitted log-logistic is +-Inf;
+                                       # clamp to +-value (e.g. 3.09, p = 0.001) or "none". R/q1_spei.R stops while null
     grid: native_era5land_0.1          # 0.05 deg cells take the containing 0.1 deg cell
     precip_source: ECMWF/ERA5_LAND/HOURLY total_precipitation_hourly   # sum of the 24 hours of the UTC day
     et0: fao56_era5land                # physiofire.preprocess.aed
