@@ -35,12 +35,19 @@ select_q1_cells <- function(ct, qcfg) {
   out
 }
 
-# SPEI handling of values outside the support of the fitted distribution (+-Inf): clamp to +-limit (NULL = keep)
+# Clip every SPEI value to [-limit, +limit] (NULL = keep): infinite values (outside the support of the fitted
+# distribution) and finite values beyond the limit alike, so that the ordering of the values is kept
 clamp_spei <- function(x, limit) {
   if (is.null(limit)) return(x)
-  x[is.infinite(x) & x < 0] <- -limit
-  x[is.infinite(x) & x > 0] <- limit
-  x
+  pmin(pmax(x, -limit), limit)
+}
+
+# Counts of clipped values, infinite and finite separately (x = SPEI before clipping)
+clip_counts <- function(x, limit) {
+  fin <- is.finite(x)
+  c(n_inf_low = sum(x == -Inf, na.rm = TRUE), n_inf_high = sum(x == Inf, na.rm = TRUE),
+    n_finite_low = if (is.null(limit)) 0L else sum(fin & x < -limit),
+    n_finite_high = if (is.null(limit)) 0L else sum(fin & x > limit))
 }
 
 # Put 29 February back as NA: x has 365 values per year for dates_noleap; returns values on dates_all

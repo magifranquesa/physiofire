@@ -29,7 +29,7 @@ cfg <- read_yaml("config/config.yaml")
 cfg$drought_q1$out_dir <- tmp
 cfg$drought_q1$spei$out_dir <- file.path(tmp, "spei")
 cfg$drought_q1$spei$scales_days <- c(30L, 90L)
-cfg$drought_q1$spei$inf_clamp <- 3.09
+cfg$drought_q1$spei$clip <- 3.09
 cfg_file <- file.path(tmp, "config_test.yaml")
 write_yaml(cfg, cfg_file)
 rc <- system2(file.path(R.home("bin"), "Rscript"), c("R/q1_spei.R", "2", cfg_file), stdout = TRUE, stderr = TRUE)

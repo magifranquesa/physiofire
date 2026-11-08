@@ -76,7 +76,11 @@ Se usan las mismas fuentes y filtros que en el caso 2025, sin cortes por incendi
 - **Distribución:** log-logística, ajustada por momentos ponderados no sesgados (valores por defecto del paquete SPEI de R, versión 1.8.1), con un ajuste por día del año. El 29 de febrero se elimina.
 - **Referencia:** 1991–2020. ERA5-Land diario está disponible desde 1950.
 - **Paso a 0,05°:** cada celda de 0,05° toma el valor de la celda de 0,1° que la contiene.
-- **Valores fuera del rango de la referencia:** cuando un periodo es más seco (o más húmedo) que todo lo visto en 1991–2020, la log-logística ajustada da un SPEI de −Inf (o +Inf). Esos valores se recortan a ±3,09 (probabilidad 0,001), decidido el 8 de noviembre de 2026 antes de calcular. El número de valores recortados por escala y celda se registra en `spei_q1_clamped.csv` y se informa.
+- **Valores fuera del rango de la referencia:** todos los valores del SPEI se recortan a [−3,09, +3,09] (probabilidad 0,001 en cada cola), decidido el 8 de noviembre de 2026 antes de calcular ninguna correlación. El recorte incluye:
+  - los infinitos: cuando un periodo es más seco (o más húmedo) que todo lo visto en 1991–2020, la log-logística ajustada da −Inf (o +Inf);
+  - los valores finitos más allá de ±3,09, que llegan hasta −10,9 por las colas de la log-logística.
+  
+  Así se conserva el orden de los valores. La primera versión del código recortaba solo los infinitos, de modo que un día fuera del rango quedaba en −3,09 y otro menos seco conservaba −6; se corrigió como error antes de extraer ninguna serie. Los valores recortados se registran por escala y celda en `spei_q1_clamped.csv`, con los infinitos y los finitos por separado, para todo el registro (1991–2025) y para el periodo de salida (2018–2025), y se informan.
 - **Comprobación antes del cálculo:** que el paquete SPEI ajusta series de frecuencia 365 sobre un periodo de referencia, con una serie sintética. Si no lo hace, el mismo método (log-logística, momentos ponderados no sesgados, ajuste por día del año) se implementa en R y se valida contra el paquete con datos mensuales. Todo ello antes de calcular el SPEI de las celdas.
 
 **AED (ET0) como variable explicativa secundaria.** Anomalía respecto a la mediana por día del año (2018–2025), con la misma media centrada de 15 días. Sirve para comparar con el resultado de Tang con el VPD, porque la fisiología se alinea con la demanda atmosférica.
@@ -117,6 +121,10 @@ Se usan las mismas fuentes y filtros que en el caso 2025, sin cortes por incendi
 **Resultado positivo** si, en el estrato matorral (matorral + brezal), se cumple **H3 y además H1 o H2**. Cada hipótesis tiene que cumplirse frente al NDVI y frente al EVI.
 
 El bosque se informa con el mismo detalle y el pastizal como referencia; ninguno de los dos decide. Un resultado negativo también se documenta y es publicable.
+
+## Interpretación
+
+- **SPEI de escalas cortas en verano** (añadido el 8 de noviembre de 2026, antes de calcular ninguna correlación). En verano, con P ≈ 0, el SPEI de 15–60 días está dominado por la ET0, y su distribución de referencia es muy estrecha. Por eso concentra los valores extremos. Una respuesta de SIF/APAR a escalas cortas en verano se interpretará junto al análisis secundario con la AED.
 
 ## Diferencias con Vicente-Serrano et al. (2013, PNAS 110:52–57)
 

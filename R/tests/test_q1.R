@@ -24,6 +24,11 @@ ok(nrow(s) == 2 && all(s$fuel_class == c("shrubland", "grassland")), "selection:
 ok(identical(s$stratum, c("shrubland", "grassland")) && identical(s$aridity_class, c("semiarid", "dry_subhumid")),
    "selected cells carry stratum and aridity class")
 ok(isTRUE(all.equal(clamp_spei(c(-Inf, -1, Inf, NA), 3.09), c(-3.09, -1, 3.09, NA))), "clamp of infinite SPEI")
+ok(isTRUE(all.equal(clamp_spei(c(-6, -3.5, -3.09, 3.2, 10), 3.09), c(-3.09, -3.09, -3.09, 3.09, 3.09))),
+   "finite values beyond the limit are clipped too")
+ok(identical(clip_counts(c(-Inf, -6, -3.09, -1, 4, Inf, Inf, NA), 3.09),
+             c(n_inf_low = 1L, n_inf_high = 2L, n_finite_low = 1L, n_finite_high = 1L)),
+   "clip counts: infinite and finite separately; a value equal to the limit is not counted")
 ok(identical(clamp_spei(c(-Inf, 1), NULL), c(-Inf, 1)), "no clamp when limit is NULL")
 dates <- seq(as.Date("2020-02-27"), as.Date("2020-03-02"), by = "day")
 nl <- dates[format(dates, "%m-%d") != "02-29"]

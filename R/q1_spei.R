@@ -17,8 +17,8 @@ q <- cfg$drought_q1; sp <- q$spei
 args <- commandArgs(trailingOnly = TRUE)
 n_cores <- if (length(args) >= 1) as.integer(args[1]) else max(1L, detectCores() - 2L)
 scales <- as.integer(unlist(sp$scales_days)); ref <- as.integer(unlist(sp$reference))
-limit <- if (is.null(sp$inf_clamp)) stop("drought_q1.spei.inf_clamp must be set (decision pending)") else
-  if (identical(sp$inf_clamp, "none")) NULL else as.numeric(sp$inf_clamp)
+limit <- if (is.null(sp$clip)) stop("drought_q1.spei.clip must be set (decision pending)") else
+  if (identical(sp$clip, "none")) NULL else as.numeric(sp$clip)
 
 cells <- read_csv(file.path(q1_path(root, q$out_dir), "drought_q1_cells.csv"), show_col_types = FALSE)
 e5 <- unique(cells[, c("lon01", "lat01")])
@@ -44,15 +44,17 @@ out_days <- dates[dates >= out_start]
 one_cell <- function(j) {
   if (all(is.na(Dn[, j]))) {                      # ERA5-Land cell without land data (coast): SPEI missing
     na_out <- rep(NA_real_, sum(dates >= out_start))
-    res <- lapply(scales, function(s) list(spei = na_out, coef = matrix(NA_real_, 3, 365), n_inf = 0L))
+    zero <- clip_counts(numeric(0), limit)
+    res <- lapply(scales, function(s) list(spei = na_out, coef = matrix(NA_real_, 3, 365), n_all = zero, n_out = zero))
     names(res) <- paste0("spei_", sprintf("%03d", scales))
     return(res)
   }
   res <- lapply(scales, function(s) {
     r <- spei_daily(Dn[, j], y_first, s, ref)
     v <- clamp_spei(r$spei, limit)
+    in_out <- nl$dates >= out_start
     list(spei = restore_feb29(v, nl$dates, dates)[dates >= out_start], coef = r$coef,
-         n_inf = sum(is.infinite(r$spei)))
+         n_all = clip_counts(r$spei, limit), n_out = clip_counts(r$spei[in_out], limit))
   })
   names(res) <- paste0("spei_", sprintf("%03d", scales))
   res
@@ -64,7 +66,7 @@ lib_paths <- .libPaths()
 cl <- makeCluster(n_cores, setup_timeout = 300, rscript_args = "--no-init-file")
 invisible(clusterCall(cl, function(p) .libPaths(p), lib_paths))
 clusterExport(cl, c("Dn", "nl", "dates", "out_start", "scales", "ref", "limit", "y_first", "spei_daily", "roll_sum",
-                    "clamp_spei", "restore_feb29"))
+                    "clamp_spei", "clip_counts", "restore_feb29"))
 clusterEvalQ(cl, suppressPackageStartupMessages(library(SPEI)))
 res <- parLapply(cl, seq_len(ncol(Dn)), one_cell)
 stopCluster(cl)
@@ -83,20 +85,23 @@ f <- file.path(wb_dir, "spei_q1.nc")
 nco <- nc_create(f, vars)
 for (v in names(res[[1]])) ncvar_put(nco, v, sapply(res, function(r) r[[v]]$spei))
 ncvar_put(nco, "lon01", e5$lon01); ncvar_put(nco, "lat01", e5$lat01)
-ncatt_put(nco, 0, "method", sprintf("log-logistic, ub-pwm, one fit per day of year (29 Feb removed), reference %d-%d, SPEI %s; +-Inf clamped to %s",
+ncatt_put(nco, 0, "method", sprintf("log-logistic, ub-pwm, one fit per day of year (29 Feb removed), reference %d-%d, SPEI %s; all values clipped to +-%s (infinite and finite beyond)",
                                     ref[1], ref[2], as.character(packageVersion("SPEI")),
                                     if (is.null(limit)) "none" else limit))
 nc_close(nco)
 saveRDS(list(cells = e5, scales = scales, coef = lapply(res, function(r) lapply(r, `[[`, "coef"))),
         file.path(wb_dir, "spei_q1_params.rds"))
-# clamped values per scale and cell (whole record and output period), as required by the plan
-clamp_tab <- do.call(rbind, lapply(seq_along(res), function(j) data.frame(
-  cell = j, lon01 = e5$lon01[j], lat01 = e5$lat01[j], scale_days = scales,
-  n_clamped_all = sapply(res[[j]], `[[`, "n_inf"),
-  n_clamped_low_output = sapply(res[[j]], function(r) sum(r$spei <= -limit + 1e-9, na.rm = TRUE) * !is.null(limit)),
-  n_clamped_high_output = sapply(res[[j]], function(r) sum(r$spei >= limit - 1e-9, na.rm = TRUE) * !is.null(limit)))))
+# clipped values per scale and cell, infinite and finite separately, for the whole record (1991-) and the output
+# period, as required by the plan
+cnt <- function(r, k) setNames(r[[k]], paste0(names(r[[k]]), if (k == "n_all") "_all" else "_output"))
+clamp_tab <- do.call(rbind, lapply(seq_along(res), function(j) cbind(
+  data.frame(cell = j, lon01 = e5$lon01[j], lat01 = e5$lat01[j], scale_days = scales),
+  do.call(rbind, lapply(res[[j]], function(r) c(cnt(r, "n_all"), cnt(r, "n_out")))))))
+rownames(clamp_tab) <- NULL
 write.csv(clamp_tab, file.path(wb_dir, "spei_q1_clamped.csv"), row.names = FALSE)
-ninf <- aggregate(cbind(n_clamped_all, n_clamped_low_output, n_clamped_high_output) ~ scale_days, clamp_tab, sum)
-ninf$cells_with_clamping <- tapply(clamp_tab$n_clamped_all > 0, clamp_tab$scale_days, sum)
-print(ninf)
+num <- grep("^n_", names(clamp_tab), value = TRUE)
+summ <- aggregate(clamp_tab[num], list(scale_days = clamp_tab$scale_days), sum)
+summ$cells_clipped_all <- as.vector(tapply(rowSums(clamp_tab[grep("_all$", num, value = TRUE)]) > 0,
+                                           clamp_tab$scale_days, sum))
+print(summ)
 message("wrote ", f)
