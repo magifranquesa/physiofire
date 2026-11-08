@@ -243,4 +243,4 @@ Concretan puntos que el texto aprobado dejaba abiertos.
 
 ## Configuración fijada antes de ejecutar
 
-Commit: se anota tras el commit.
+Fijado antes de ejecutar: commit `d093008` (plan aprobado, recuento ciego de eventos, código, tests y sección `drought_q1b` de `config/config.yaml`).
