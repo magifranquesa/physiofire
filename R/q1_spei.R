@@ -42,6 +42,12 @@ Dn <- D[nl$x, , drop = FALSE]
 out_start <- as.Date(sprintf("%s-01-01", substr(q$period[[1]], 1, 4)))
 out_days <- dates[dates >= out_start]
 one_cell <- function(j) {
+  if (all(is.na(Dn[, j]))) {                      # ERA5-Land cell without land data (coast): SPEI missing
+    na_out <- rep(NA_real_, sum(dates >= out_start))
+    res <- lapply(scales, function(s) list(spei = na_out, coef = matrix(NA_real_, 3, 365), n_inf = 0L))
+    names(res) <- paste0("spei_", sprintf("%03d", scales))
+    return(res)
+  }
   res <- lapply(scales, function(s) {
     r <- spei_daily(Dn[, j], y_first, s, ref)
     v <- clamp_spei(r$spei, limit)
@@ -52,7 +58,7 @@ one_cell <- function(j) {
   res
 }
 t0 <- Sys.time()
-cl <- makeCluster(n_cores)
+cl <- makeCluster(n_cores, setup_timeout = 300)
 clusterExport(cl, c("Dn", "nl", "dates", "out_start", "scales", "ref", "limit", "y_first", "spei_daily", "roll_sum",
                     "clamp_spei", "restore_feb29"))
 clusterEvalQ(cl, suppressPackageStartupMessages(library(SPEI)))
