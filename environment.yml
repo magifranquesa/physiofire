@@ -9,6 +9,8 @@ dependencies:
   - python=3.11
   - pip
   - numpy
+  - libblas=*=*openblas   # OpenBLAS, not MKL: MKL loads its CPU-specific DLLs from PATH at run time, so numpy
+                          # BLAS calls crashed (0xc06d007f) when python.exe ran without activating the env
   - pandas
   - xarray
   - dask
