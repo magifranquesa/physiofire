@@ -62,6 +62,7 @@ Se usan las mismas fuentes y filtros que en el caso 2025, sin cortes por incendi
 - **Distribución:** log-logística, ajustada por momentos ponderados no sesgados (valores por defecto del paquete SPEI de R, versión 1.8.1), con un ajuste por día del año. El 29 de febrero se elimina.
 - **Referencia:** 1991–2020. ERA5-Land diario está disponible desde 1950.
 - **Paso a 0,05°:** cada celda de 0,05° toma el valor de la celda de 0,1° que la contiene.
+- **Valores fuera del rango de la referencia:** cuando un periodo es más seco (o más húmedo) que todo lo visto en 1991–2020, la log-logística ajustada da un SPEI de −Inf (o +Inf). Esos valores se recortan a ±3,09 (probabilidad 0,001), decidido el 8 de noviembre de 2026 antes de calcular. El número de valores recortados por escala y celda se registra en `spei_q1_clamped.csv` y se informa.
 - **Comprobación antes del cálculo:** que el paquete SPEI ajusta series de frecuencia 365 sobre un periodo de referencia, con una serie sintética. Si no lo hace, el mismo método (log-logística, momentos ponderados no sesgados, ajuste por día del año) se implementa en R y se valida contra el paquete con datos mensuales. Todo ello antes de calcular el SPEI de las celdas.
 
 **AED (ET0) como variable explicativa secundaria.** Anomalía respecto a la mediana por día del año (2018–2025), con la misma media centrada de 15 días. Sirve para comparar con el resultado de Tang con el VPD, porque la fisiología se alinea con la demanda atmosférica.

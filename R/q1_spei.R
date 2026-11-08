@@ -79,6 +79,14 @@ ncatt_put(nco, 0, "method", sprintf("log-logistic, ub-pwm, one fit per day of ye
 nc_close(nco)
 saveRDS(list(cells = e5, scales = scales, coef = lapply(res, function(r) lapply(r, `[[`, "coef"))),
         file.path(wb_dir, "spei_q1_params.rds"))
-ninf <- sapply(names(res[[1]]), function(v) sum(sapply(res, function(r) r[[v]]$n_inf)))
+# clamped values per scale and cell (whole record and output period), as required by the plan
+clamp_tab <- do.call(rbind, lapply(seq_along(res), function(j) data.frame(
+  cell = j, lon01 = e5$lon01[j], lat01 = e5$lat01[j], scale_days = scales,
+  n_clamped_all = sapply(res[[j]], `[[`, "n_inf"),
+  n_clamped_low_output = sapply(res[[j]], function(r) sum(r$spei <= -limit + 1e-9, na.rm = TRUE) * !is.null(limit)),
+  n_clamped_high_output = sapply(res[[j]], function(r) sum(r$spei >= limit - 1e-9, na.rm = TRUE) * !is.null(limit)))))
+write.csv(clamp_tab, file.path(wb_dir, "spei_q1_clamped.csv"), row.names = FALSE)
+ninf <- aggregate(cbind(n_clamped_all, n_clamped_low_output, n_clamped_high_output) ~ scale_days, clamp_tab, sum)
+ninf$cells_with_clamping <- tapply(clamp_tab$n_clamped_all > 0, clamp_tab$scale_days, sum)
 print(ninf)
 message("wrote ", f)
