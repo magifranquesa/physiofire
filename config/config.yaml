@@ -466,6 +466,7 @@ drought_q1:
     permutations: 199                  # whole-year permutation of the vegetation series; max over scales x lags
     alpha: 0.05
     h1_min_fraction: 0.60              # SIF/APAR scale shorter (strictly) than NDVI and than EVI
+    h1_ties_count_as_shorter: false
     h2_scale_days: 90
     h2_max_median_lag_diff_days: -5    # median L(SIF/APAR) - L(NDVI or EVI) <= -5, CI entirely below 0
     bootstrap_block_deg: 1.0

@@ -2,6 +2,15 @@
 
 **Estado:** aprobado por el investigador el 8 de noviembre de 2026. Este plan y la sección `drought_q1` de `config/config.yaml` se fijan en git **antes** de descargar la referencia, calcular el SPEI o extraer ninguna serie para el análisis. Después no se cambia ningún parámetro: los errores se corrigen documentados como tales, y cualquier ajuste motivado por los resultados se hace como análisis adicional marcado como posterior.
 
+## Concreciones aprobadas (8 de noviembre de 2026, antes de calcular)
+
+1. Significación de la correlación máxima: permutación de años completos de la serie de vegetación frente al SPEI (199 permutaciones), recalculando el máximo sobre todas las escalas y desfases.
+2. Cada hipótesis (H1, H2, H3) tiene que cumplirse frente al NDVI y frente al EVI. En H1, los empates de escala no cuentan como “más corta”.
+3. Eventos de sequía: celdas contiguas (vecindad de 8) con inicios a ±15 días; solo cuentan los eventos de al menos 10 celdas.
+4. Precipitación diaria: suma de las 24 imágenes horarias de ERA5-Land del día UTC, no el agregado diario de GEE.
+5. El paquete SPEI se comprueba con una serie sintética antes de usarlo con datos diarios. Si no ajusta bien series de frecuencia 365, se implementa el mismo método y se valida contra el paquete, siempre antes de calcular el SPEI de las celdas.
+6. Las anomalías se estandarizan con la desviación típica de cada celda en todo el periodo.
+
 ## Pregunta e hipótesis
 
 **Pregunta.** ¿SIF/APAR detecta el estrés hídrico antes y a escalas más cortas que el NDVI/EVI en la vegetación natural de la Península, con independencia de los incendios?
