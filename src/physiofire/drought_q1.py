@@ -76,7 +76,7 @@ def build_series(cfg: dict, cells: pd.DataFrame) -> xr.Dataset:
     if not np.array_equal(sp_days[pos], days):
         raise ValueError("SPEI does not cover the analysis period")
     for s in q["spei"]["scales_days"]:
-        out[f"spei_{int(s):03d}"] = sp[f"spei_{int(s):03d}"].values[pos][:, kk]
+        out[f"spei_{int(s):03d}"] = sp[f"spei_{int(s):03d}"].transpose("time", "cell").values[pos][:, kk]   # R writes (cell, time)
     ds = xr.Dataset({k: (("time", "cell"), v.astype("f4")) for k, v in out.items()},
                     coords={"time": days.astype("datetime64[ns]"), "cell": np.arange(len(cells))})
     for c in ("iy", "ix", "lon", "lat", "fuel_class", "stratum", "aridity_class", "lon01", "lat01"):
