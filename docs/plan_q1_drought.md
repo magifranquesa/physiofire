@@ -11,6 +11,20 @@
 5. El paquete SPEI se comprueba con una serie sintética antes de usarlo con datos diarios. Si no ajusta bien series de frecuencia 365, se implementa el mismo método y se valida contra el paquete, siempre antes de calcular el SPEI de las celdas.
 6. Las anomalías se estandarizan con la desviación típica de cada celda en todo el periodo.
 
+## Detalles de implementación (pendientes de aprobación; fijados en el código antes de calcular correlaciones)
+
+Código: `src/physiofire/drought_q1.py`, con tests sintéticos en `tests/test_drought_q1.py`.
+
+1. **Día de respuesta con huecos.** Un día faltante en la anomalía suavizada no corta la racha ni cuenta como respuesta. La racha de 15 días tiene que empezar en un día válido, todos sus días válidos deben quedar ≤ −0,5 DE y al menos la mitad de sus días deben ser válidos. Así se evita que los huecos del NDVI/EVI de mayo–junio retrasen artificialmente su respuesta, lo que favorecería a SIF/APAR.
+2. **Eventos y estratos.** Los eventos se forman con todas las celdas seleccionadas (al menos 10 celdas en total). El estadístico de cada estrato usa solo las celdas de ese estrato dentro de cada evento; los eventos sin celdas del estrato con respuesta en las dos variables no cuentan.
+3. **Variables secundarias** (SIF, SIF/PAR, fPAR): se calculan *r\**, *s\** y *L\** sin prueba de permutación, porque son solo descriptivas. La permutación se aplica a SIF/APAR, NDVI y EVI, frente al SPEI y frente a la AED.
+4. **Filtro de picos:** se aplica a SIF/APAR, SIF, SIF/PAR, NDVI y EVI, pero no al fPAR (compuestos interpolados) ni a la AED ni al SPEI.
+5. **Mínimo de pares:** una correlación necesita al menos 30 pares día-vegetación / día-SPEI válidos.
+6. **2018:** la estación empieza el 1 de mayo (inicio de TROPOMI); abril de 2018 queda como faltante.
+7. **Inicio de episodio válido:** entre 30 días después del comienzo del periodo y 105 días antes de su final (ventana +90 y racha de 15 días).
+8. **Significación de H2:** a la escala fija del SPEI-90, el máximo de las permutaciones se toma solo sobre los desfases.
+9. **Estandarización de la AED:** igual que las variables de vegetación (mediana por día del año, media centrada de 15 días, desviación típica de todo el periodo).
+
 ## Pregunta e hipótesis
 
 **Pregunta.** ¿SIF/APAR detecta el estrés hídrico antes y a escalas más cortas que el NDVI/EVI en la vegetación natural de la Península, con independencia de los incendios?
