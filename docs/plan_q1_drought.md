@@ -11,7 +11,9 @@
 5. El paquete SPEI se comprueba con una serie sintética antes de usarlo con datos diarios. Si no ajusta bien series de frecuencia 365, se implementa el mismo método y se valida contra el paquete, siempre antes de calcular el SPEI de las celdas.
 6. Las anomalías se estandarizan con la desviación típica de cada celda en todo el periodo.
 
-## Detalles de implementación (pendientes de aprobación; fijados en el código antes de calcular correlaciones)
+## Detalles de implementación (aprobados el 8 de noviembre de 2026; fijados en el código antes de calcular correlaciones)
+
+**Configuración fijada antes de extraer las series:** commit `76ae9af` (código, `config/config.yaml` y este plan; esta nota se añade en un commit solo de documentación).
 
 Código: `src/physiofire/drought_q1.py`, con tests sintéticos en `tests/test_drought_q1.py`.
 
