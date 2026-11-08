@@ -493,6 +493,60 @@ drought_q1:
   out_dir: data/processed/drought_q1
   fig_dir: figures/drought_q1
 
+# Q1b (docs/plan_q1b.md): post hoc follow-up of question 1, approved 2026-11-08; fixed in git before running.
+# Everything not listed here is taken from drought_q1 (series, filters, climatology, strata, permutations,
+# bootstrap, event rule, onset months, response window and response rule).
+drought_q1b:
+  episodes:
+    order: [B, A, C]                   # fixed fallback order; chosen by counting events from SPEI only
+    min_events: 10                     # events (>= event_min_cells cells) containing shrubland cells
+    min_separation_days: 90            # A and B: onsets of a cell closer than this keep the first
+    B:                                 # rapid intensification (flash-drought style; Noguera et al. 2020, verificar)
+      threshold: -1.0                  # SPEI-90 below this ...
+      min_duration_days: 30            # ... for >= 30 days from the onset
+      min_fall: 1.0                    # fall >= 1.0 from the maximum of the previous 30 days
+      fall_days: 30
+    A:                                 # intensification across category thresholds
+      thresholds: [-1.0, -1.5, -2.0]   # downward crossing of SPEI-90
+      min_duration_days: 30            # below the crossed threshold for >= 30 days
+      pre_days: 60                     # SPEI-90 >= threshold + pre_margin on at least one of the previous 60 days
+      pre_margin: 0.5
+    C:                                 # rule of question 1 on SPEI-30
+      spei_scale_days: 30
+      onset_threshold: -1.0
+      min_duration_days: 20
+      pre_days: 30
+      pre_threshold: -0.5              # all previous 30 days above
+  h3b:
+    censor_day: 90                     # no response in -30..+90 days -> censored at +90 (kept, not excluded)
+    min_events: 10                     # events with an informative shrubland cell; fewer -> not evaluable
+    max_median_diff_days: -5           # (b) magnitude; (a) mean score < 0 with the bootstrap CI below 0
+    min_observed_frac: 0.5             # variable observed in the episode: smoothed anomaly finite on >= 50 % of
+                                       # onset-30 .. onset+104 days; otherwise the pair is not used (counted)
+    anomalies: q1                      # main: anomalies of question 1 (centred 15-day mean, SIF/APAR uncorrected);
+                                       # sensitivity: backward mean and SIF/APAR corrected for PAR
+    seasons: {spring: [3, 4, 5], summer: [6, 7, 8, 9]}   # descriptive stratum (median onset month of the event)
+  analysis1:
+    smoothing: backward                # 15-day mean ending at t (main); centred: sensitivity
+    lags_days: [-15, 60]
+    h2b_exclude_boundary: true         # cells with either lag at -15 or +60 are excluded from H2b (counted)
+  par_correction:
+    fit_spei_scale_days: 90            # slope of z(SIF/APAR) on z(PAR) fitted on April-October days with
+    fit_min_spei: 0.0                  # SPEI-90 >= 0 (outside drought), applied to all days, before smoothing
+    min_days: 30                       # fewer fit days -> corrected SIF/APAR missing for the cell
+    sensitivity: partial_correlation   # max partial r of uncorrected SIF/APAR with SPEI given PAR (all days)
+  noise:
+    replicate_seeds: [42, 43, 44, 45, 46]
+    f_cap: 0.99                        # target noise fraction capped (f >= 1 cannot be reached by adding noise)
+    robust_h1: median_replicate        # H1 met in the replicate with the median fraction
+  decision: >-
+    shrubland, against NDVI and against EVI separately: support if H3b and ((H1 PAR-corrected and robust H1) or
+    H2b); contrary if H3b is evaluable and not met; not conclusive if H3b is not evaluable, or if H3b is met
+    without H1 (corrected and robust) or H2b. Overall: support if support against both; contrary if contrary
+    against either; otherwise not conclusive.
+  out_dir: data/processed/drought_q1b
+  fig_dir: figures/drought_q1b
+
 random_seed: 42
 
 paths:

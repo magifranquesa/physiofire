@@ -1,0 +1,4 @@
+definition,n_episodes,n_cells_with_episode,n_events,n_events_with_shrubland,n_shrubland_cells_in_events,n_events_with_forest,n_forest_cells_in_events,n_events_with_grassland,n_grassland_cells_in_events
+B,18638,6708,242,228,3632,154,1128,159,1081
+A,21431,6720,266,249,3633,169,1145,174,1082
+C,2451,2059,56,55,1041,29,134,30,215

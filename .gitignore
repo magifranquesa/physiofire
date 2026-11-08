@@ -53,3 +53,12 @@ data/processed/drought_q1/*
 !data/processed/drought_q1/summary_*.csv
 !data/processed/drought_q1/posthoc_events.csv
 !data/processed/drought_q1/posthoc_par_diagnostic.csv
+!data/processed/drought_q1b/
+data/processed/drought_q1b/*
+!data/processed/drought_q1b/event_count.csv
+!data/processed/drought_q1b/definition.json
+!data/processed/drought_q1b/hypotheses_q1b.csv
+!data/processed/drought_q1b/decision_q1b.csv
+!data/processed/drought_q1b/decision_q1b.json
+!data/processed/drought_q1b/noise_h1_replicates.csv
+!data/processed/drought_q1b/summary_*.csv

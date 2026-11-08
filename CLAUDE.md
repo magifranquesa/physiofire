@@ -25,11 +25,26 @@ Evaluar si el estado fisiológico de la vegetación observado desde satélite pe
 
 **Para qué sirve el resultado:** un artículo con el investigador como autor de correspondencia (envío hacia mayo–junio de 2027), resultados preliminares para una beca MSCA postdoctoral (cierre habitual en septiembre de 2027) y un resumen para la EGU (plazo habitual en enero de 2027).
 
-## Objetivo actual: pregunta 1 (prioridad absoluta desde el 8 de noviembre de 2026)
+## Objetivo actual: pregunta 1 cerrada (negativa); Q1b pendiente
 
 > ¿SIF/APAR detecta el estrés hídrico antes y a escalas más cortas que el NDVI/EVI en la vegetación natural de la Península, con independencia de los incendios?
 
-- Plan prerregistrado: `docs/plan_q1_drought.md` y `config.yaml` (sección `drought_q1`), fijados en git antes de calcular nada.
+- **Resultado de la pregunta 1 (8 de noviembre de 2026): negativo según el criterio prerregistrado.** Está en `docs/results_q1_drought.md`. En matorral:
+  - **H1 se cumple:** SIF/APAR tiene una escala de SPEI más corta en el 71 % de las celdas frente al NDVI y en el 80 % frente al EVI.
+  - **H2 se cumple solo frente al EVI** (−5 días).
+  - **H3 no se cumple:** solo hay 6 eventos de sequía en total.
+  - **Observaciones posteriores, marcadas como tales:**
+    - en los eventos de agosto responde SIF/APAR y no el NDVI;
+    - parte de la relación de SIF/APAR con la AED la lleva el PAR;
+    - los desfases están censurados en 0.
+- **Q1b (seguimiento posterior, con criterio propio):** `docs/plan_q1b.md`, aprobado el 8 de noviembre de 2026; config `drought_q1b`, código `src/physiofire/drought_q1b.py`. Incluye:
+  - H3b con censura a +90 días y episodios de intensificación rápida;
+  - desfases de −15 a +60 días con media hacia atrás;
+  - SIF/APAR corregido por el PAR;
+  - una prueba de ruido de H1.
+
+  Ejecución pendiente. Q1b no cambia el resultado negativo de la pregunta 1.
+- Plan prerregistrado de la pregunta 1: `docs/plan_q1_drought.md` y `config.yaml` (sección `drought_q1`), fijados en git antes de calcular nada.
 - Celdas de 0,05° de vegetación natural sin quemar desde 2013, en 2018–2025.
 - SPEI diario de 15 a 365 días (ERA5-Land, referencia 1991–2020) y AED como variable secundaria.
 - Análisis 1: escala y desfase de máxima correlación. Análisis 2: respuesta en episodios de sequía.

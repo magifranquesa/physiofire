@@ -1,0 +1,38 @@
+{
+ "chosen": "B",
+ "counts": {
+  "B": {
+   "n_episodes": 18638,
+   "n_cells_with_episode": 6708,
+   "n_events": 242,
+   "n_events_with_shrubland": 228,
+   "n_shrubland_cells_in_events": 3632,
+   "n_events_with_forest": 154,
+   "n_forest_cells_in_events": 1128,
+   "n_events_with_grassland": 159,
+   "n_grassland_cells_in_events": 1081
+  },
+  "A": {
+   "n_episodes": 21431,
+   "n_cells_with_episode": 6720,
+   "n_events": 266,
+   "n_events_with_shrubland": 249,
+   "n_shrubland_cells_in_events": 3633,
+   "n_events_with_forest": 169,
+   "n_forest_cells_in_events": 1145,
+   "n_events_with_grassland": 174,
+   "n_grassland_cells_in_events": 1082
+  },
+  "C": {
+   "n_episodes": 2451,
+   "n_cells_with_episode": 2059,
+   "n_events": 56,
+   "n_events_with_shrubland": 55,
+   "n_shrubland_cells_in_events": 1041,
+   "n_events_with_forest": 29,
+   "n_forest_cells_in_events": 134,
+   "n_events_with_grassland": 30,
+   "n_grassland_cells_in_events": 215
+  }
+ }
+}
