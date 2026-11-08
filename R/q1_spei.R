@@ -58,7 +58,11 @@ one_cell <- function(j) {
   res
 }
 t0 <- Sys.time()
-cl <- makeCluster(n_cores, setup_timeout = 300)
+# workers without the project start-up file (renv activation in many workers at once made them fail to connect);
+# they get the project library paths explicitly, so the same package versions are used
+lib_paths <- .libPaths()
+cl <- makeCluster(n_cores, setup_timeout = 300, rscript_args = "--no-init-file")
+invisible(clusterCall(cl, function(p) .libPaths(p), lib_paths))
 clusterExport(cl, c("Dn", "nl", "dates", "out_start", "scales", "ref", "limit", "y_first", "spei_daily", "roll_sum",
                     "clamp_spei", "restore_feb29"))
 clusterEvalQ(cl, suppressPackageStartupMessages(library(SPEI)))
