@@ -1,0 +1,13 @@
+stratum,against,outcome
+shrubland,ndvi,contrary
+shrubland,evi,contrary
+shrubland,both,contrary
+forest,ndvi,contrary
+forest,evi,contrary
+forest,both,contrary
+grassland,ndvi,contrary
+grassland,evi,contrary
+grassland,both,contrary
+wet_heath_only,ndvi,contrary
+wet_heath_only,evi,contrary
+wet_heath_only,both,contrary

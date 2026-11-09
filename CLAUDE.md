@@ -25,7 +25,7 @@ Evaluar si el estado fisiológico de la vegetación observado desde satélite pe
 
 **Para qué sirve el resultado:** un artículo con el investigador como autor de correspondencia (envío hacia mayo–junio de 2027), resultados preliminares para una beca MSCA postdoctoral (cierre habitual en septiembre de 2027) y un resumen para la EGU (plazo habitual en enero de 2027).
 
-## Objetivo actual: pregunta 1 cerrada (negativa); Q1b pendiente
+## Objetivo actual: pregunta 1 cerrada (negativa); Q1b cerrada (contraria)
 
 > ¿SIF/APAR detecta el estrés hídrico antes y a escalas más cortas que el NDVI/EVI en la vegetación natural de la Península, con independencia de los incendios?
 
@@ -43,7 +43,12 @@ Evaluar si el estado fisiológico de la vegetación observado desde satélite pe
   - SIF/APAR corregido por el PAR;
   - una prueba de ruido de H1.
 
-  Ejecución pendiente. Q1b no cambia el resultado negativo de la pregunta 1.
+  **Resultado de Q1b (9 de noviembre de 2026): contrario en matorral según su criterio** (plan fijado en `d093008`). Está en `docs/results_q1b.md`:
+  - **H3b no se cumple** (definición B, 141–145 eventos): frente al NDVI, +0,17 [+0,06, +0,29] (el NDVI responde antes); frente al EVI, −0,04 [−0,16, +0,07] (sin diferencia).
+  - **H1 corregido por el PAR y robusto al ruido se cumple** (0,68–0,81); **H2b solo frente al EVI** (−6 días).
+  - **Observaciones posteriores, marcadas como tales:** el 30 % de las respuestas del NDVI caen en el día −30 (ya estaba bajo antes del inicio); en primavera responden antes los índices ópticos y en verano SIF/APAR frente al EVI. Es una hipótesis para un diseño futuro, no un resultado.
+
+  Q1b no cambia el resultado negativo de la pregunta 1.
 - Plan prerregistrado de la pregunta 1: `docs/plan_q1_drought.md` y `config.yaml` (sección `drought_q1`), fijados en git antes de calcular nada.
 - Celdas de 0,05° de vegetación natural sin quemar desde 2013, en 2018–2025.
 - SPEI diario de 15 a 365 días (ERA5-Land, referencia 1991–2020) y AED como variable secundaria.
