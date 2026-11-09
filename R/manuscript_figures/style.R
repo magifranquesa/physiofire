@@ -34,8 +34,14 @@ theme_ms <- function() {
 
 tags_abc <- function() plot_annotation(tag_levels = "a", tag_prefix = "(", tag_suffix = ")")
 
-# Vector PDF (cairo, fonts embedded) and 600 ppi PNG
+# Vector PDF (cairo, fonts embedded) and 600 ppi PNG. With options(ms.collect = <environment>) the figure is stored
+# in that environment instead (used by all_figures.R to build one PDF with every figure).
 save_fig <- function(p, name, width, height) {
+  env <- getOption("ms.collect")
+  if (is.environment(env)) {
+    assign(name, list(plot = p, width = width, height = height), envir = env)
+    return(invisible(NULL))
+  }
   ggsave(file.path(fig_dir, paste0(name, ".pdf")), p, width = width, height = height, units = "mm",
          device = cairo_pdf, family = FONT)
   ggsave(file.path(fig_dir, paste0(name, ".png")), p, width = width, height = height, units = "mm", dpi = 600,

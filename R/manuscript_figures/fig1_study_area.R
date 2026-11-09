@@ -121,6 +121,12 @@ pb <- ggplot() +
   guides(colour = guide_legend(override.aes = list(fill = c(NA, NA, "grey50"), alpha = c(1, 1, 0.5),
                                                    linewidth = c(0.6, 0.6, 0.3)), nrow = 2))
 
-p <- (pa | pb) + plot_layout(widths = c(1.15, 1)) +
+# (a) aligned to the top of (b) (spacer below it); tag placed above the panel, clear of the axis labels
+tag_top <- theme(plot.tag.position = "top", plot.tag = element_text(hjust = 0, size = BASE_PT + 2, face = "bold",
+                                                                    family = FONT, margin = margin(0, 0, 3, 0, unit = "mm")))
+pa <- pa & tag_top
+pb <- pb + tag_top
+left <- (pa / plot_spacer()) + plot_layout(heights = c(1, 0.22))
+p <- (left | pb) + plot_layout(widths = c(1.15, 1)) +
   plot_annotation(tag_levels = list(c("(a)", "", "(b)")))
 save_fig(p, "fig1_study_area", WIDTH_DOUBLE, 135)

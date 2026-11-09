@@ -15,6 +15,7 @@ source("R/epoch_lib.R")
 ec <- cfg$epoch
 thr <- as.numeric(ec$effect_threshold_sd)
 MIN_FIRES <- 3L
+CONTROL_COL <- "grey35"                                            # control line (dotted) and band: grey
 vars <- c("sif_apar_nopersist", "ndvi", "evi", "fwi", "aed")
 groups <- c(all = "All fires", shrubland = "Shrubland", heathland = "Heathland")
 gfun <- list(all = function(x) rep(TRUE, nrow(x)), shrubland = function(x) x$clc_group == "shrubland",
@@ -59,8 +60,10 @@ col_plot <- function(g) {
     geom_hline(yintercept = c(-thr, thr), colour = "grey60", linewidth = 0.25, linetype = "longdash") +
     geom_ribbon(aes(ymin = control_ci_lo, ymax = control_ci_hi), fill = "grey60", alpha = 0.25, na.rm = TRUE) +
     geom_ribbon(aes(ymin = ci_lo, ymax = ci_hi, fill = var), alpha = 0.3, na.rm = TRUE) +
-    geom_line(data = long |> filter(group == g), aes(y = y, colour = var, linetype = line, linewidth = line),
-              na.rm = TRUE) +
+    geom_line(data = long |> filter(group == g, line == "Controls"), aes(y = y, linetype = line, linewidth = line),
+              colour = CONTROL_COL, na.rm = TRUE) +
+    geom_line(data = long |> filter(group == g, line != "Controls"),
+              aes(y = y, colour = var, linetype = line, linewidth = line), na.rm = TRUE) +
     geom_text(data = nf |> filter(group == g), aes(x = -59, y = yl[2], label = lab), inherit.aes = FALSE,
               hjust = 0, vjust = 1, size = (BASE_PT - 1) / .pt, family = FONT, colour = "grey30") +
     facet_grid(var ~ ., switch = "y") +
@@ -78,14 +81,15 @@ ps <- lapply(names(groups), col_plot)
 ps[[1]] <- ps[[1]] + labs(y = "Standardised anomaly (SD)")
 ps[2:3] <- lapply(ps[2:3], function(p) p + theme(strip.text.y.left = element_blank(), strip.background.y = element_blank()))
 # legend drawn as its own strip (line + band keys), above the panels
+# difference and burned keys in black (drawn in the colour of each variable); controls in grey, as drawn
 leg_items <- tibble(x = c(0, 1.25, 2.5), lab = names(lt), lty = unname(lt), lwd = unname(lw),
-                    band = c("grey45", NA, "grey60"))
+                    band = c("grey45", NA, "grey60"), col = c("black", "black", CONTROL_COL))
 leg <- ggplot(leg_items) +
   geom_rect(data = leg_items |> filter(!is.na(band)), aes(xmin = x, xmax = x + 0.28, ymin = -0.35, ymax = 0.35,
                                                            fill = band), alpha = 0.35) +
-  geom_segment(aes(x = x, xend = x + 0.28, y = 0, yend = 0, linetype = lty, linewidth = lwd), colour = "black") +
+  geom_segment(aes(x = x, xend = x + 0.28, y = 0, yend = 0, linetype = lty, linewidth = lwd, colour = col)) +
   geom_text(aes(x = x + 0.33, y = 0, label = lab), hjust = 0, size = (BASE_PT - 0.5) / .pt, family = FONT) +
-  scale_fill_identity() + scale_linetype_identity() + scale_linewidth_identity() +
+  scale_fill_identity() + scale_linetype_identity() + scale_linewidth_identity() + scale_colour_identity() +
   coord_cartesian(xlim = c(-0.9, 4.4), ylim = c(-0.6, 0.6), expand = FALSE) + theme_void()
 ps <- lapply(ps, function(p) p + theme(legend.position = "none"))
 p <- leg / wrap_plots(ps, nrow = 1) + plot_layout(heights = c(0.035, 1)) +
