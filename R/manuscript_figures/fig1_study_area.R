@@ -15,10 +15,10 @@ suppressPackageStartupMessages({ library(sf); library(terra) })
 sf_use_s2(FALSE)
 
 FUEL_LAB <- c(closed_forest = "Closed forest", open_forest = "Open forest", shrubland = "Shrubland",
-              wet_heath = "Heathland and wetland", grassland = "Grassland", cropland = "Cropland",
+              wet_heath = "Heathland", grassland = "Grassland", cropland = "Cropland",
               nonfuel = "Non-fuel")
 FUEL_COL <- c(`Closed forest` = "#2d6a4f", `Open forest` = "#8fbf88", Shrubland = "#c9a66b",
-              `Heathland and wetland` = "#a77ba6", Grassland = "#ece59a", Cropland = "#e6e0d3",
+              Heathland = "#a77ba6", Grassland = "#ece59a", Cropland = "#e6e0d3",
               `Non-fuel` = "#ffffff")
 CELL_COL <- c(`Burned cells` = "#D55E00", Controls = "#0072B2")   # Okabe-Ito vermilion and blue
 
