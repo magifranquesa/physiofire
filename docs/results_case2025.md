@@ -29,6 +29,7 @@ Criterio tal como está escrito en CLAUDE.md y en el borrador (sección 2.10), a
 - **La diferencia incendio–control del FWI es prácticamente nula** (media de los últimos 15 días: +0,00 DE), así que la condición de "FWI parecido" se cumple.
 - **Pero SIF/APAR tampoco difiere:** la diferencia es ligeramente positiva (+0,13 DE de media en los últimos 15 días), en sentido contrario al esperado, y su intervalo incluye el cero casi todos los días.
 - **El resultado es negativo en matorral y en brezal por separado.**
+- **Matiz en brezal:** la diferencia incendio–control del FWI es positiva al final de la ventana. La media de los últimos 15 días es +0,15 DE, y el intervalo excluye el cero en 7 de esos 15 días (tabla de abajo). La antelación sigue siendo 0 [0, 5] y SIF/APAR tampoco difiere ahí (+0,06 DE). *Precisión añadida el 9 de noviembre de 2026; los datos no cambian.*
 
 Según CLAUDE.md, corresponde replantear (otra resolución, SIF/PAR, otra región) antes de invertir más. Un resultado negativo también es publicable. No se ha lanzado ninguna prueba de sensibilidad ni análisis adicional.
 

@@ -240,6 +240,7 @@ Un sondeo previo con 400 celdas y el PAR reconstruido como SIF/(SIF/APAR × fPAR
 
 - **Según el criterio prerregistrado, la pregunta 1 da un resultado negativo.**
 - El análisis 1 muestra que la escala óptima de SIF/APAR es más corta que la del NDVI y la del EVI en matorral y bosque, aunque no en pastizal. Esto es coherente con la hipótesis fisiológica, con dos reservas pendientes: el ruido y la radiación.
+  - *Resueltas en Q1b (`docs/results_q1b.md`; nota del 9 de noviembre de 2026):* con SIF/APAR corregido por el PAR y con el ruido igualado, H1 se mantiene **en matorral** frente al NDVI y frente al EVI (0,71 / 0,81 y 0,68 / 0,80). **En bosque solo se mantiene frente al EVI** (0,64 y 0,63); frente al NDVI baja a 0,52 y 0,50, por debajo de 0,60.
 - El desfase no separa SIF/APAR del NDVI, por la censura en 0.
 - La prueba de episodios (H3) no tiene muestra suficiente para decidir.
 - El análisis de seguimiento Q1b (`docs/plan_q1b.md`) se declara posterior y se evaluará con su propio criterio. No cambia este resultado.

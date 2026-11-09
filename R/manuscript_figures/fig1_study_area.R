@@ -69,22 +69,32 @@ bb <- c(xmin = min(cells$lon[cells$fire_id %in% nw$fire_id]) - 0.25,
         ymin = min(cells$lat[cells$fire_id %in% nw$fire_id]) - 0.25,
         ymax = max(cells$lat[cells$fire_id %in% nw$fire_id]) + 0.25)
 
+# one symbol per fire (point on the largest polygon of its perimeter), so that small fires are visible in (a)
+fire_pts <- per |> group_by(id) |> summarise(.groups = "drop") |> st_point_on_surface()   # sf unions geometries
+stopifnot(nrow(fire_pts) == nrow(fires))
+
 # --- (a) Iberia ----------------------------------------------------------------------------------------------------
 xa <- c(-9.6, 3.4); ya <- c(35.9, 44.0)
 pa <- ggplot() +
   geom_sf(data = ne, fill = "grey92", colour = "grey60", linewidth = 0.15) +
   geom_tile(data = fuel_df, aes(x, y, fill = fuel), width = res, height = res) +
   geom_sf(data = iberia, fill = NA, colour = "grey30", linewidth = 0.2) +
-  geom_sf(data = per, fill = "black", colour = "black", linewidth = 0.15) +
+  geom_sf(data = per, aes(colour = "Fire perimeters (EFFIS)"), fill = "black", linewidth = 0.15) +
+  geom_sf(data = fire_pts, aes(shape = "Fires (n = 22)"), fill = CELL_COL[["Burned cells"]], colour = "black",
+          size = 1.7, stroke = 0.35) +
   annotate("rect", xmin = bb["xmin"], xmax = bb["xmax"], ymin = bb["ymin"], ymax = bb["ymax"], fill = NA,
            colour = "black", linewidth = 0.4) +
-  annotate("text", x = bb["xmax"], y = bb["ymax"], label = "(b)", hjust = -0.2, vjust = 1, size = BASE_PT / .pt,
-           family = FONT, fontface = "bold") +
+  annotate("text", x = bb["xmin"], y = bb["ymax"], label = "b", hjust = 0, vjust = -0.3,
+           size = (BASE_PT - 0.5) / .pt, family = FONT, fontface = "bold") +
   scale_bar(-9.3, 36.1, 200, 36.5) +
+  scale_colour_manual(values = c(`Fire perimeters (EFFIS)` = "black"), name = NULL) +
+  scale_shape_manual(values = c(`Fires (n = 22)` = 24), name = NULL) +
   scale_fill_manual(values = FUEL_COL, name = NULL, drop = FALSE) +
   coord_sf(xlim = xa, ylim = ya, expand = FALSE, crs = 4326) + map_theme +
-  theme(legend.position = "bottom") +
-  guides(fill = guide_legend(nrow = 2, override.aes = list(colour = "grey55", linewidth = 0.2)))
+  theme(legend.position = "bottom", legend.box = "vertical", legend.spacing.y = unit(0.5, "mm")) +
+  guides(fill = guide_legend(order = 1, nrow = 2, override.aes = list(colour = "grey55", linewidth = 0.2)),
+         colour = "none",                                    # perimeters: legend of panel (b)
+         shape = guide_legend(order = 2, override.aes = list(fill = CELL_COL[["Burned cells"]], size = 2)))
 
 eu_box <- st_as_sfc(st_bbox(c(xmin = xa[1], xmax = xa[2], ymin = ya[1], ymax = ya[2]), crs = 4326))
 inset <- ggplot() +
@@ -100,15 +110,17 @@ pb <- ggplot() +
   geom_sf(data = ne, fill = "grey92", colour = "grey60", linewidth = 0.15) +
   geom_tile(data = fuel_df, aes(x, y, fill = fuel), width = res, height = res, alpha = 0.75) +
   geom_sf(data = iberia, fill = NA, colour = "grey30", linewidth = 0.25) +
-  geom_sf(data = per, fill = "grey20", colour = "black", alpha = 0.35, linewidth = 0.2) +
+  geom_sf(data = per, aes(colour = "Fire perimeters (EFFIS)"), fill = "grey20", alpha = 0.35, linewidth = 0.2) +
   geom_sf(data = cells_sf, aes(colour = kind), fill = NA, linewidth = 0.35) +
   scale_bar(bb[["xmin"]] + 0.1, bb[["ymin"]] + 0.08, 50, mean(bb[c("ymin", "ymax")])) +
   scale_fill_manual(values = FUEL_COL, guide = "none") +
-  scale_colour_manual(values = CELL_COL, name = NULL) +
+  scale_colour_manual(values = c(CELL_COL, `Fire perimeters (EFFIS)` = "black"), name = NULL,
+                      breaks = c(names(CELL_COL), "Fire perimeters (EFFIS)")) +
   coord_sf(xlim = bb[c("xmin", "xmax")], ylim = bb[c("ymin", "ymax")], expand = FALSE, crs = 4326) + map_theme +
   theme(legend.position = "bottom") +
-  guides(colour = guide_legend(override.aes = list(fill = NA, linewidth = 0.6)))
+  guides(colour = guide_legend(override.aes = list(fill = c(NA, NA, "grey50"), alpha = c(1, 1, 0.5),
+                                                   linewidth = c(0.6, 0.6, 0.3)), nrow = 2))
 
-p <- (pa | pb) + plot_layout(widths = c(1.35, 1)) +
+p <- (pa | pb) + plot_layout(widths = c(1.15, 1)) +
   plot_annotation(tag_levels = list(c("(a)", "", "(b)")))
-save_fig(p, "fig1_study_area", WIDTH_DOUBLE, 115)
+save_fig(p, "fig1_study_area", WIDTH_DOUBLE, 135)

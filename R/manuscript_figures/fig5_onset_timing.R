@@ -47,12 +47,14 @@ med <- pb_data |> group_by(season, against) |>
 pb <- ggplot(pb_data, aes(d, fill = against, alpha = type)) +
   geom_histogram(binwidth = 5, boundary = 0, colour = NA, position = "stack") +
   geom_vline(xintercept = 0, colour = "grey30", linewidth = 0.3) +
-  geom_vline(data = med, aes(xintercept = md), linetype = "22", linewidth = 0.4, colour = "grey10") +
+  geom_vline(data = med, aes(xintercept = md, linetype = "Median d (median over events)"), linewidth = 0.4,
+             colour = "grey10", key_glyph = "path") +
   geom_text(data = med, aes(x = -118, y = Inf, label = sprintf("%d pairs\nmedian d = %+.0f", n, md)),
             inherit.aes = FALSE, hjust = 0, vjust = 1.2, size = (BASE_PT - 1) / .pt, family = FONT,
             lineheight = 0.9, colour = "grey25") +
-  facet_grid(against ~ season, scales = "free_y") +
+  facet_grid(against ~ season) +                                   # same vertical scale in both rows
   scale_fill_manual(values = VAR_COL, guide = "none") +
+  scale_linetype_manual(values = c(`Median d (median over events)` = "22"), name = NULL) +
   scale_alpha_manual(values = c(`Both responded` = 0.9, `One censored at +90 (bound)` = 0.4), name = NULL) +
   scale_x_continuous(limits = c(-120, 120), breaks = seq(-100, 100, 50)) +
   labs(x = "d = response day of SIF/APAR − reference (days; < 0: SIF/APAR first)", y = "Cell-episodes") +

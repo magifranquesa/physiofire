@@ -7,12 +7,14 @@
 # DESCRIPTIVE CALCULATION FOR THE FIGURE: the control line is the mean over fires of the per-fire control anomaly in
 # epoch_fire_days.csv, with the same fire-level bootstrap as the burned line (epoch_lib.R .boot_ci, same B, level and
 # seed); it is not used by any criterion. The burned mean recomputed the same way is checked against the report.
+# Days with fewer than MIN_FIRES fires with data are not drawn (the label gives the range of fires per day drawn).
 # Usage (from the repository root): Rscript R/manuscript_figures/fig2_epoch.R
 
 source("R/manuscript_figures/style.R")
 source("R/epoch_lib.R")
 ec <- cfg$epoch
 thr <- as.numeric(ec$effect_threshold_sd)
+MIN_FIRES <- 3L
 vars <- c("sif_apar_nopersist", "ndvi", "evi", "fwi", "aed")
 groups <- c(all = "All fires", shrubland = "Shrubland", heathland = "Heathland")
 gfun <- list(all = function(x) rep(TRUE, nrow(x)), shrubland = function(x) x$clc_group == "shrubland",
@@ -36,9 +38,12 @@ e <- e |> left_join(ctl, by = c("group", "variable", "day_rel")) |>
 chk <- max(abs(e$mean_burned - e$mean_burned_chk), na.rm = TRUE)
 message(sprintf("check: max |burned mean recomputed - report| = %.2e", chk))
 stopifnot(chk < 1e-9)
+e <- e |> mutate(across(c(mean_diff, ci_lo, ci_hi, mean_burned, mean_control, control_ci_lo, control_ci_hi),
+                        ~ ifelse(n_fires >= MIN_FIRES, .x, NA_real_)))
 
-nf <- e |> group_by(group, var) |> summarise(lo = min(n_fires), hi = max(n_fires), .groups = "drop") |>
-  mutate(lab = ifelse(lo == hi, sprintf("%d fires", hi), sprintf("%d–%d fires per day", lo, hi)))
+nf <- e |> filter(n_fires >= MIN_FIRES) |> group_by(group, var) |>
+  summarise(lo = min(n_fires), hi = max(n_fires), .groups = "drop") |>
+  mutate(lab = ifelse(lo == hi, sprintf("n = %d fires", hi), sprintf("n = %d–%d fires", lo, hi)))
 yl <- range(c(e$ci_lo, e$ci_hi, e$mean_burned, e$control_ci_lo, e$control_ci_hi, -thr, thr), na.rm = TRUE)
 lt <- c(`Burned − control` = "solid", `Burned cells` = "22", `Controls` = "12")
 lw <- c(`Burned − control` = 0.6, `Burned cells` = 0.35, `Controls` = 0.35)
@@ -66,11 +71,23 @@ col_plot <- function(g) {
     labs(title = groups[[g]], x = "Days before ignition", y = NULL) + theme_ms() +
     theme(plot.title = element_text(size = BASE_PT + 1, hjust = 0.5, family = FONT),
           strip.placement = "outside", strip.text.y.left = element_text(angle = 90),
-          legend.position = "bottom", legend.key.width = unit(8, "mm"))
+          legend.position = "top", legend.key.width = unit(7, "mm"), legend.key.height = unit(2.5, "mm"),
+          legend.text = element_text(size = BASE_PT - 0.5, family = FONT))
 }
 ps <- lapply(names(groups), col_plot)
 ps[[1]] <- ps[[1]] + labs(y = "Standardised anomaly (SD)")
 ps[2:3] <- lapply(ps[2:3], function(p) p + theme(strip.text.y.left = element_blank(), strip.background.y = element_blank()))
-p <- wrap_plots(ps, nrow = 1) + plot_layout(guides = "collect") + tags_abc() &
-  theme(legend.position = "bottom")
+# legend drawn as its own strip (line + band keys), above the panels
+leg_items <- tibble(x = c(0, 1.25, 2.5), lab = names(lt), lty = unname(lt), lwd = unname(lw),
+                    band = c("grey45", NA, "grey60"))
+leg <- ggplot(leg_items) +
+  geom_rect(data = leg_items |> filter(!is.na(band)), aes(xmin = x, xmax = x + 0.28, ymin = -0.35, ymax = 0.35,
+                                                           fill = band), alpha = 0.35) +
+  geom_segment(aes(x = x, xend = x + 0.28, y = 0, yend = 0, linetype = lty, linewidth = lwd), colour = "black") +
+  geom_text(aes(x = x + 0.33, y = 0, label = lab), hjust = 0, size = (BASE_PT - 0.5) / .pt, family = FONT) +
+  scale_fill_identity() + scale_linetype_identity() + scale_linewidth_identity() +
+  coord_cartesian(xlim = c(-0.9, 4.4), ylim = c(-0.6, 0.6), expand = FALSE) + theme_void()
+ps <- lapply(ps, function(p) p + theme(legend.position = "none"))
+p <- leg / wrap_plots(ps, nrow = 1) + plot_layout(heights = c(0.035, 1)) +
+  plot_annotation(tag_levels = list(c("", "(a)", "(b)", "(c)")))
 save_fig(p, "fig2_epoch_2025", WIDTH_DOUBLE, 180)
