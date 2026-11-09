@@ -123,7 +123,12 @@ Medianas, con la moda entre paréntesis. SIF/APAR, NDVI y EVI: celdas con *r\** 
 **Escalas en matorral.** La escala de SIF/APAR se reparte así: 15–30 días, 23 %; 60–90 días, 65 %; 180–365 días, 12 %. En el NDVI, el 68 % de las celdas está en 180–365 días, y en el EVI, el 75 %. Figuras: `q1_scale_share.png` y `q1_scale_maps.png`.
 
 **Por clase de aridez:**
-- SIF/APAR responde a 60 días en las celdas húmedas de todos los estratos y a 90 días en las semiáridas y subhúmedas secas.
+- SIF/APAR (mediana, con la moda entre paréntesis):
+  - en las celdas húmedas responde a 60 días en todos los estratos;
+  - en las semiáridas, a 90 días;
+  - en las subhúmedas secas, a 60 días en matorral (moda 90; 311 celdas) y a 90 días en bosque y pastizal.
+
+  En matorral: semiárido 90 (90), 1776 celdas; subhúmedo seco 60 (90), 311 celdas; húmedo 60 (60), 468 celdas. *Corregido el 9 de noviembre de 2026: la versión anterior decía 90 días también en el matorral subhúmedo seco, contra `summary_scale_lag.csv`. Error de redacción; los datos no cambian.*
 - El NDVI y el EVI de matorral y bosque responden a 180–365 días en las clases semiárida y subhúmeda seca, y a 90–180 días en las húmedas.
 - En el pastizal, todo responde a unos 90 días.
 

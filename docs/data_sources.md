@@ -470,3 +470,10 @@ Tang es la base conceptual, no un método a replicar (CLAUDE.md, 7 de noviembre 
 - Variables en el archivo: `fwinx`, `ffmcode`, `dufmcode` y `drtcode`. Coordenadas `valid_time`, `latitude` (de 44,75 a 35,25) y `longitude` (de −10,25 a 4,75).
 - La misma clave del CDS sirve en el EWDS (URL `https://ewds.climate.copernicus.eu/api`). Hay que aceptar una vez las condiciones de uso del EWDS (aceptadas el 7 de noviembre de 2026).
 - `python -m physiofire.download.cems_fwi --year 2025 --months 8` → `data/raw/cems_fwi/cems_fwi_YYYYMM.nc`.
+
+## Límites de países: Natural Earth admin-0 1:10m (9 de noviembre de 2026)
+
+Solo para la cartografía de la figura 1 (costa, fronteras y mapa de situación de Europa); no entra en ningún cálculo. ✅
+- Natural Earth, *Admin 0 – Countries*, escala 1:10m, versión 5.1.1 (`ne_10m_admin_0_countries.VERSION.txt`). Dominio público.
+- Descarga: `https://naciscdn.org/naturalearth/10m/cultural/ne_10m_admin_0_countries.zip` (4,9 MB; SHA-256 `ce1ac7036499a0edd641fbc093cd209a98f96a49d2eca8480aaacad35138a7f6`), descomprimido en `data/raw/naturalearth/ne_10m_admin_0_countries/` (fuera de git).
+- La usa `R/manuscript_figures/fig1_study_area.R` (España y Portugal: `ADM0_A3` ESP y PRT).
