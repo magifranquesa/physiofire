@@ -555,3 +555,21 @@ paths:
   processed: data/processed
   fires: data/fires
   figures: figures
+
+# Exploratory time-series figures (2026-11-09; descriptive only, no statistics; figures marked "exploratory").
+# Cells chosen by the fixed rules below, without looking at SIF/APAR or the optical series.
+explore_timeseries:
+  fires:                               # data/fires/selected_fires.csv (not excluded)
+    ignition_month: "2025-08"
+    per_country: 3                     # largest by EFFIS burned_ha in ES and in PT
+    burned_cell_veg: [shrubland, wet_heath]   # burned cell = highest burned fraction among cells of these classes
+    controls_per_cell: 2               # the fire's controls with the lowest matching score (R/epoch_cells.R)
+  drought:                             # question 1 cells, episodes of definition B (data/processed/drought_q1b)
+    onset_window: ["2022-06-01", "2022-09-30"]
+    fuel_class: shrubland
+    n_events: 4                        # largest events (cells) with a shrubland cell; per event, the shrubland cell
+                                       # nearest the mean position of the event's cells
+  months: [4, 10]                      # April-October of the case year
+  smoothing: backward                  # 15-day mean ending on the day (drought_q1.anomalies.smooth_days, min_frac)
+  out_dir: data/interim/explore
+  fig_dir: figures/explore
