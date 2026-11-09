@@ -1,6 +1,6 @@
 # Comprobaciones de cierre del manuscrito
 
-**9 de noviembre de 2026.** Respuesta a la revisión externa (`docs/chatgpt/CIERRE_MANUSCRITO_SIF_INSTRUCCIONES_CLAUDE_CODE.md`, usado solo como referencia; su plan no se ha ejecutado).
+**9 de noviembre de 2026.** Respuesta a la revisión externa (`docs/reviews/CIERRE_MANUSCRITO_SIF_INSTRUCCIONES_CLAUDE_CODE.md`, versionada sin cambios; usada solo como referencia, su plan no se ha ejecutado).
 
 Reglas de este documento:
 - No se cambia ningún resultado original.
