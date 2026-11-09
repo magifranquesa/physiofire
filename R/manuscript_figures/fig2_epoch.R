@@ -92,6 +92,6 @@ leg <- ggplot(leg_items) +
   scale_fill_identity() + scale_linetype_identity() + scale_linewidth_identity() + scale_colour_identity() +
   coord_cartesian(xlim = c(-0.9, 4.4), ylim = c(-0.6, 0.6), expand = FALSE) + theme_void()
 ps <- lapply(ps, function(p) p + theme(legend.position = "none"))
-p <- leg / wrap_plots(ps, nrow = 1) + plot_layout(heights = c(0.035, 1)) +
-  plot_annotation(tag_levels = list(c("", "(a)", "(b)", "(c)")))
+p <- wrap_plots(ps, nrow = 1) / leg + plot_layout(heights = c(1, 0.035)) +
+  plot_annotation(tag_levels = list(c("(a)", "(b)", "(c)", "")))
 save_fig(p, "fig2_epoch_2025", WIDTH_DOUBLE, 180)

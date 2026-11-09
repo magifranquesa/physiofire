@@ -33,7 +33,7 @@ share_panel <- function(d, facet_col, facet_levels, title = NULL, y_lab) {
     scale_fill_manual(values = VAR_COL, name = NULL) +
     scale_y_continuous(labels = scales::percent_format(accuracy = 1), expand = expansion(mult = c(0, 0.05))) +
     labs(x = "Optimal SPEI scale (days)", y = y_lab, title = title) + theme_ms() +
-    theme(legend.position = "top", legend.margin = margin(0, 0, 0, 0),
+    theme(legend.position = "bottom", legend.margin = margin(0, 0, 0, 0),
           strip.text = element_text(size = BASE_PT - 0.5, lineheight = 0.95),
           plot.title = element_text(size = BASE_PT + 0.5, family = FONT))
 }
