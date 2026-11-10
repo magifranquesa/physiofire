@@ -203,3 +203,41 @@ Matiz para Métodos (caso 2025): la cadena de SIF/APAR se cerró antes de fijar 
 - El 6 de noviembre (`6baf86d`) ya se había calculado SIF/APAR regional del 1 de junio al 7 de septiembre de 2025 sobre toda la Península (tarea 4, prueba de la cadena de SIF/APAR).
 - La regla de selección no usa SIF/APAR, y las series de las celdas quemadas y de los controles se extrajeron solo después de `a7f894f`.
 - Conviene decirlo así ("selection rule and configuration fixed before extracting any fire or control series") y no "before any SIF/APAR computation".
+
+## 7. Versión de TROPOSIF (10 de noviembre de 2026)
+
+- **TROPOSIF L2B**, procesador **01.00.01**, colección **03**, distribuido por S5P-PAL y producido por UPV.
+  - Comprobado en los atributos `processor_version` y `collection_identifier` de los 3104 archivos diarios descargados, del 1 de mayo de 2018 al 3 de noviembre de 2026: todos son la misma versión.
+  - 2018–2022 viene del reprocesado de la misión (archivos producidos en 2023) y lo posterior, del procesado continuo, con la misma versión.
+- **Variable:** `SIF_Corr_743`.
+- **Ajustes del algoritmo** que constan en los atributos: ventana de 743–758 nm, referencia a 740 nm, umbrales del procesador de fracción de nubes 0,8, SZA 70° y VZA 60°.
+- **Huecos:** ninguno en 2018–2025. Solo faltan 5 días de octubre de 2026, fuera del periodo del estudio.
+- **Cita sugerida:** el manual del producto (PUM v1.0) y Guanter et al. (2021, ESSD) **(verificar)**.
+
+## 8. Focos activos de MODIS C6.1 (10 de noviembre de 2026)
+
+- **Se descargaron y se depuraron, pero no entran en ningún resultado.**
+  - `R/firms_clean.R` procesa la fuente FIRMS `M-C61` (configurada como "backup only"): 48 971 detecciones tras la depuración.
+  - El único script que lee las detecciones, `R/fire_candidates.R`, filtra solo las fuentes VIIRS (SV-C2, J1V-C2 y J2V-C2).
+- La fecha de ignición y la comprobación de actividad previa usan VIIRS (375 m, colección 2), MCD64A1, VNP64A1 y EFFIS.
+- No hay que confundirlos con el área quemada MCD64A1 C6.1, que sí se usa.
+
+## 9. Tabla 1 del manuscrito frente a lo usado (10 de noviembre de 2026)
+
+**Las 16 filas corresponden a datasets usados.** Correcciones:
+- **Perímetros de EFFIS, "Sentinel-2, 20 m":** la capa descargada es `modis.ba.poly.shp`, y en `docs/data_sources.md` consta "MODIS 250 m". **(Verificar** en la documentación de EFFIS antes de dejar Sentinel-2.)
+- **MCD64A1 y VNP64A1, "2013–2026":** la historia de quemas cubre 2013–2025 y las fechas de quema, de octubre de 2024 a enero de 2026.
+- **AED:** la serie diaria del análisis cubre 2017–2026. Los años 1991–2016 de ET₀ solo entran en el SPEI.
+- **Versiones que faltan:**
+  - FirEUrisk v2.0 (10.21950/YABYCN);
+  - ESFire30 (Zenodo 10.5281/zenodo.20257001);
+  - SRTM: CGIAR v4.1 (`CGIAR/SRTM90_V4`);
+  - CEMS: `cems-fire-historical-v1`, versión 4_1 (EWDS).
+- **TROPOSIF, resolución:** 3,5 × 7 km hasta agosto de 2019 y 3,5 × 5,5 km después.
+
+**Se usan en los análisis y no están en la tabla:**
+- máscara de tierra firme (USDOS LSIB_SIMPLE 2017, en GEE; selección de celdas con fracción de tierra ≥ 0,5);
+- ERA5-Land horario (entradas del FWI a las 12:00 UTC, viento de la ET₀ y precipitación del SPEI);
+- `LC_MASK` de TROPOSIF (MCD12C1 de 2018; filtro de nieve y suelo desnudo).
+
+**Descargados pero fuera de los resultados:** NBAR de MCD43A4 y fPAR de VNP15A2H (sensibilidades), focos de MODIS C6.1 y MCD12C1 como clasificación. Natural Earth solo se usa en el mapa de la Fig. 1.

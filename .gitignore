@@ -65,3 +65,8 @@ data/processed/drought_q1b/*
 # personal drafts in docs/ (manuscript and notes), not versioned
 docs/*.docx
 docs/Anticipar grandes incendios en la Pen*nsula Ib*rica sequ*a, meteorolog*a y estad.pdf
+# calibration of the SIF/APAR validity thresholds (approved run only; data/processed/screening/README.md)
+!data/processed/screening/
+data/processed/screening/*
+!data/processed/screening/README.md
+!data/processed/screening/shrubland/
