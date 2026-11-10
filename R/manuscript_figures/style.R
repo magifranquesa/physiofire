@@ -14,10 +14,10 @@ FONT <- "Arial"; BASE_PT <- 7
 
 # One colour per variable in every figure (same hues as figures/explore/).
 VAR_COL <- c(`SIF/APAR` = "#d95f02", NDVI = "#1b7837", EVI = "#762a83", FWI = "#b2182b", AED = "#8c510a",
-             `SPEI-90` = "#2166ac", SPEI = "#2166ac",
+             `SPEI-90` = "#2166ac", `SPEI-3` = "#2166ac", SPEI = "#2166ac",
              SIF = "#f4a261", `SIF/PAR` = "#fdd0a2", fPAR = "#bdbdbd")   # secondary: lighter tones
 VAR_LAB <- c(sif_apar = "SIF/APAR", sif_apar_nopersist = "SIF/APAR", ndvi = "NDVI", evi = "EVI", fwi = "FWI",
-             aed = "AED", spei_090 = "SPEI-90", sif = "SIF", sif_par = "SIF/PAR", fpar = "fPAR")
+             aed = "AED", spei_090 = "SPEI-3", sif = "SIF", sif_par = "SIF/PAR", fpar = "fPAR")
 
 theme_ms <- function() {
   theme_bw(base_size = BASE_PT, base_family = FONT) +

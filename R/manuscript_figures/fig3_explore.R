@@ -3,7 +3,7 @@
 # cells chosen by a fixed rule before inspection). Main text: A Rua (fire 278475); Supplement S3: the other five
 # fires and the summer 2022 drought. The exploratory status is stated in the caption, not in the figure.
 # Columns: burned cell and two controls (fires) or one cell per drought event; rows SIF/APAR, NDVI, EVI (grey points:
-# daily standardised anomaly; line: backward 15-day mean) and SPEI-90. Dashed line: ignition / drought onset.
+# daily standardised anomaly; line: backward 15-day mean) and SPEI-90 (labelled SPEI-3: daily SPEI with a 90-day accumulation). Dashed line: ignition / drought onset.
 # Usage (from the repository root): Rscript R/manuscript_figures/fig3_explore.R
 
 source("R/manuscript_figures/style.R")

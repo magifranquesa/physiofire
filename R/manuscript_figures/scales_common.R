@@ -7,6 +7,8 @@ source("R/manuscript_figures/style.R")
 q <- cfg$drought_q1
 alpha <- as.numeric(q$analysis1$alpha); h1_min <- as.numeric(q$analysis1$h1_min_fraction)
 scales_d <- as.integer(unlist(q$spei$scales_days))
+# axis labels in months (daily SPEI accumulated over 15-365 days; 30 days = 1 month, 365 days = 12 months)
+SCALE_MONTHS <- c(`15` = "0.5", `30` = "1", `60` = "2", `90` = "3", `180` = "6", `365` = "12")
 MAIN_V <- c("sif_apar", "ndvi", "evi"); SEC_V <- c("sif", "sif_par", "fpar")
 # fuel classes of the figure: closed and open forest merged as "Forest" (as the forest stratum in panel c)
 FUEL_FIG <- c(closed_forest = "Forest", open_forest = "Forest", shrubland = "Shrubland", wet_heath = "Heathland",
@@ -16,7 +18,7 @@ ARID_LAB <- c(semiarid = "Semi-arid", dry_subhumid = "Dry sub-humid", humid = "H
 scale_cells <- read_csv(file.path(root, "data/processed/drought_q1/analysis1_cells.csv"), show_col_types = FALSE) |>
   filter(explanatory == "spei", !is.na(scale_days), (variable %in% MAIN_V & p < alpha) | variable %in% SEC_V) |>
   mutate(var = factor(VAR_LAB[variable], levels = unname(VAR_LAB[c(MAIN_V, SEC_V)])),
-         scale = factor(scale_days, levels = scales_d))
+         scale = factor(scale_days, levels = scales_d, labels = SCALE_MONTHS[as.character(scales_d)]))
 
 # Share of cells by scale per facet; the facet label carries the counts (in the order of the variables)
 share_panel <- function(d, facet_col, facet_levels, title = NULL, y_lab) {
@@ -32,7 +34,7 @@ share_panel <- function(d, facet_col, facet_levels, title = NULL, y_lab) {
     facet_wrap(~lab, nrow = 1) +
     scale_fill_manual(values = VAR_COL, name = NULL) +
     scale_y_continuous(labels = scales::percent_format(accuracy = 1), expand = expansion(mult = c(0, 0.05))) +
-    labs(x = "Optimal SPEI scale (days)", y = y_lab, title = title) + theme_ms() +
+    labs(x = "Optimal SPEI time scale (months)", y = y_lab, title = title) + theme_ms() +
     theme(legend.position = "bottom", legend.margin = margin(0, 0, 0, 0),
           strip.text = element_text(size = BASE_PT - 0.5, lineheight = 0.95),
           plot.title = element_text(size = BASE_PT + 0.5, family = FONT))

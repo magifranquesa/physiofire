@@ -23,8 +23,8 @@ pb <- share_panel(shr |> mutate(arid = ARID_LAB[aridity_class]), "arid", ARID_LA
                   title = "Shrubland and heathland, by aridity class", y_lab = YLAB) +
   theme(legend.position = "none")
 
-st_lab <- c(shrubland = "Shrubland\n(decides)", forest = "Forest", grassland = "Grassland\n(reference)",
-            wet_heath_only = "Heathland\n(descriptive)")
+st_lab <- c(shrubland = "Shrubland\nstratum", forest = "Forest", grassland = "Grassland\n(reference)",
+            wet_heath_only = "Heathland only\n(descriptive)")
 h <- read_csv(file.path(root, "data/processed/drought_q1/hypotheses.csv"), show_col_types = FALSE) |>
   filter(hypothesis == "H1", stratum %in% names(st_lab)) |>
   mutate(stratum = factor(st_lab[stratum], levels = rev(st_lab)), against = factor(toupper(against), c("NDVI", "EVI")))
