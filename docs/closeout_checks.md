@@ -278,3 +278,49 @@ Fuente: `data/processed/epoch/report2025_lead_times.csv` (`R/epoch_report_2025.R
 **Notas para la redacción:**
 1. **FWI en brezal, [12, 60]: límite superior censurado.** 60 es el principio de la ventana (día −60). En el 2,5 % superior de las réplicas, el FWI de las celdas quemadas está ≥ 0,5 DE durante toda la ventana, así que el límite real puede ser mayor; es una cota, no una estimación.
 2. **Matorral, FWI [0, 17] y AED [0, 11]: límite inferior en 0.** Una parte de las réplicas no da ninguna antelación: el 7 % en el FWI y el 47 % en la AED. La antelación de la AED en matorral (4 días) no es robusta.
+
+## 11. Pregunta 1: definición de H2 y celdas sin SPEI (11 de noviembre de 2026)
+
+### H2 (`src/physiofire/drought_q1.py`, `max_corr_cell()` y `h2_test()`; config `drought_q1.analysis1`)
+
+- **Serie de desfases:** el desfase óptimo con **SPEI-3** (`h2_scale_days: 90`).
+  - Para cada celda e índice es el desfase de 0 a 60 días con la mayor correlación de Pearson con SPEI-90 (`lag_h2`). Usa los días de abril a octubre, con todos los años juntos.
+  - No es el desfase del óptimo global entre escalas.
+- **Celdas:** las significativas **en los dos índices a esa escala**, con p_h2 < 0,05 en SIF/APAR y en la referencia.
+  - p_h2 sale de una **prueba de permutación propia de SPEI-90**: el máximo sobre los desfases, con 199 permutaciones de años enteros de la serie de vegetación.
+  - No es la significación del máximo global (p) que usa H1.
+  - Las celdas con valores que faltan en cualquiera de los dos índices quedan fuera.
+- **Estadístico:** la mediana entre celdas de la diferencia emparejada L(SIF/APAR) − L(NDVI o EVI), en días.
+- **Intervalo:** bootstrap de bloques de 1° × 1°, que remuestrea cuadrados enteros con reemplazo (B = 2000, semilla 42, percentiles 2,5–97,5).
+- **Criterio:** mediana **≤ −5 días** y **límite superior del intervalo < 0** (`h2_max_median_lag_diff_days: -5`).
+
+| Estrato | Frente a | Celdas | Mediana (días) | IC 95 % | Se cumple |
+| --- | --- | --- | --- | --- | --- |
+| Matorral | NDVI | 2035 | 0 | [0, 0] | no |
+| Matorral | EVI | 2101 | −5 | [−7, −3] | sí |
+| Bosque | NDVI | 421 | 0 | [0, 0] | no |
+| Bosque | EVI | 475 | −4 | [−6, −1] | no |
+| Pastizal | NDVI | 693 | 0 | [0, 0] | no |
+| Pastizal | EVI | 705 | −4 | [−6, −2] | no |
+
+Fuente: `data/processed/drought_q1/hypotheses.csv`.
+
+### Celdas sin SPEI: 6771 seleccionadas, 6751 efectivas
+
+- **Criterios de selección** (`R/q1_cells.R`, `select_q1_cells()` en `R/q1_lib.R`):
+  - al menos un 50 % de tierra;
+  - clase dominante de FirEUrisk natural: bosque cerrado o abierto, matorral, brezal o pastizal;
+  - sin quemas desde 2013, por unión binaria (fracción > 0 en cualquiera de las fuentes): MCD64A1 y VNP64A1 de 2013 a 2025, EFFIS (en la práctica solo desde 2018) y ESFire30 (2013–2025, solo España).
+- **La disponibilidad de SPEI no es un criterio de selección.**
+- **20 celdas costeras no tienen SPEI ni AED** en todo el periodo. La celda de ERA5-Land de 0,1° que las contiene es mar.
+- **Desglose por estrato:**
+
+  | Estrato | Celdas |
+  | --- | --- |
+  | Matorral | 14 (una de ellas de brezal) |
+  | Bosque | 5 |
+  | Pastizal | 1 |
+
+- **Cómo quedan fuera:** su correlación es NaN en todas las variables, así que no son significativas y no entran en H1, H2 ni H3.
+- **Celdas efectivas: 6751.** Es la misma cifra que el "6751 de 6771" de `docs/results_q1_drought.md`.
+- **Comprobación:** solo lectura de `drought_q1_series.nc` y `analysis1_cells.csv`; no cambia ningún resultado.
