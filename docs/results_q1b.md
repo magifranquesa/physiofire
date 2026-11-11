@@ -41,6 +41,16 @@ Parejas en matorral frente al NDVI:
 
 Sensibilidad (media hacia atrás y SIF/APAR corregido por el PAR): mismo signo en matorral, frente al NDVI +0,24 [+0,12, +0,36] y frente al EVI +0,02 [−0,10, +0,14].
 
+- **Esta sensibilidad cambia dos cosas a la vez** (`H3b_backward_par_corrected_sens`):
+  - el suavizado: media de 15 días hacia atrás en lugar de centrada, en las tres variables;
+  - la corrección del PAR de SIF/APAR (NDVI y EVI no la tienen).
+- No hay una variante que cambie solo una de las dos, así que no se puede atribuir el desplazamiento a ninguna de ellas por separado.
+- Solo existe para todos los eventos, no por estación.
+- Detalle (139 y 144 eventos; 4340 y 4197 parejas informativas): mediana de *d* +19 días frente al NDVI y +4,5 frente al EVI.
+- No cambia ninguna conclusión: H3b no se cumple en ninguno de los dos casos.
+
+*Nota del 11 de noviembre de 2026.*
+
 ### Análisis 1b (media hacia atrás, desfases de −15 a +60, SIF/APAR corregido por el PAR)
 
 | Matorral | Frente al NDVI | Frente al EVI |
