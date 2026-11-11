@@ -3,8 +3,8 @@
 # anomaly, 95% bootstrap interval by fire) and epoch_fire_days.csv (per fire and day: mean anomaly of the burned
 # cells and of the controls). Rows: SIF/APAR without fPAR persistence, NDVI, EVI, FWI, AED; columns: all fires,
 # shrubland, heathland (same groups as the report). Lines: difference (thick, shaded interval), burned cells (dashed)
-# and controls (dotted, grey interval). Horizontal dashed lines at +-0.5 SD (lead-time threshold); no line at 0
-# (it was hidden under the difference line except where days with < MIN_FIRES fires are not drawn).
+# and controls (dotted, grey interval). Horizontal lines: 0 (thin, light grey, first layer, under bands and lines)
+# and +-0.5 SD (dashed, lead-time threshold).
 # DESCRIPTIVE CALCULATION FOR THE FIGURE: the control line is the mean over fires of the per-fire control anomaly in
 # epoch_fire_days.csv, with the same fire-level bootstrap as the burned line (epoch_lib.R .boot_ci, same B, level and
 # seed); it is not used by any criterion. The burned mean recomputed the same way is checked against the report.
@@ -57,6 +57,7 @@ long <- e |> select(group, var, day_rel, `Burned − control` = mean_diff, `Burn
 col_plot <- function(g) {
   d <- e |> filter(group == g)
   ggplot(d, aes(day_rel)) +
+    geom_hline(yintercept = 0, colour = "grey80", linewidth = 0.3) +             # first layer: under bands and lines
     geom_hline(yintercept = c(-thr, thr), colour = "grey60", linewidth = 0.25, linetype = "longdash") +
     geom_ribbon(aes(ymin = control_ci_lo, ymax = control_ci_hi), fill = "grey60", alpha = 0.25, na.rm = TRUE) +
     geom_ribbon(aes(ymin = ci_lo, ymax = ci_hi, fill = var), alpha = 0.3, na.rm = TRUE) +
