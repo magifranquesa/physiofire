@@ -6,7 +6,15 @@
 #         the xclim outputs FFMC, DMC, DC, ISI, BUI, FWI)
 # Output: printed summary of the differences (max absolute and relative), per index
 #
-# Usage (from the repository root): Rscript R/check_fwi_cffdrs.R [sample.csv]
+# Optional FFMC coefficient: cffdrs 1.9.2 computes FFMC_COEFFICIENT = 250 * 59.5 / 101 = 147.2772277 and uses it in
+# fine_fuel_moisture_code and initial_spread_index (FFMC <-> fine fuel moisture content). Passing a value (e.g. 147.2,
+# the coefficient of Van Wagner 1987 used by xclim) replaces it in the cffdrs namespace for this run only, to test
+# whether the coefficient is the only difference between the two implementations.
+#
+# Usage (from the repository root): Rscript R/check_fwi_cffdrs.R [sample.csv] [ffmc_coefficient]
+#   default run (S1.10):          Rscript R/check_fwi_cffdrs.R
+#   coefficient test (S1.10):     Rscript R/check_fwi_cffdrs.R data/interim/era5land_fwi/cffdrs_check_sample.csv 147.2
+# Sample: python -m physiofire.preprocess.fwi_cffdrs_sample
 
 suppressPackageStartupMessages({
   library(cffdrs)
@@ -14,7 +22,14 @@ suppressPackageStartupMessages({
   library(readr)
 })
 args <- commandArgs(trailingOnly = TRUE)
-f <- if (length(args)) args[1] else "data/interim/era5land_fwi/cffdrs_check_sample.csv"
+f <- if (length(args) >= 1) args[1] else "data/interim/era5land_fwi/cffdrs_check_sample.csv"
+ns <- asNamespace("cffdrs")
+cat(sprintf("cffdrs %s; FFMC_COEFFICIENT default = %.7f\n", packageVersion("cffdrs"), get("FFMC_COEFFICIENT", ns)))
+if (length(args) >= 2) {
+  coef <- as.numeric(args[2])
+  utils::assignInNamespace("FFMC_COEFFICIENT", coef, ns = "cffdrs")
+  cat(sprintf("FFMC_COEFFICIENT set to %.7f for this run\n", get("FFMC_COEFFICIENT", ns)))
+}
 x <- read_csv(f, show_col_types = FALSE) |> arrange(id, time)
 idx <- c("FFMC", "DMC", "DC", "ISI", "BUI", "FWI")
 res <- bind_rows(lapply(split(x, x$id), function(d) {

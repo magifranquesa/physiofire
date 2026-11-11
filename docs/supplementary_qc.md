@@ -147,7 +147,15 @@ Synthetic daily series (seasonal cycle plus Gaussian noise, January 2019 – Sep
 | ISI | 0.75 | 0.30 |
 | FWI | 1.7 | 0.66 |
 
-The FFMC difference has a single origin. xclim keeps the coefficient 147.2 of the original equations (Van Wagner, 1987) in the conversion between FFMC and fine fuel moisture content (Eqs. 1 and 10), whereas cffdrs uses 147.27723 (= 250 × 59.5/101), introduced in the revised official code (Wang et al., 2015). With the cffdrs coefficient set to 147.2, the maximum differences fall to 1.1 × 10⁻⁵ (FFMC) and 5 × 10⁻⁵ (FWI), i.e. storage precision. xclim was used unmodified; the difference does not affect any decision of the 2025 case, because anomalies are standardised per cell. Script: `R/check_fwi_cffdrs.R`.
+The FFMC difference has a single origin. xclim uses the coefficient 147.2 in the conversion between FFMC and fine fuel moisture content (Eqs. 1 and 10), as in the original equations (Van Wagner, 1987) and in the updated official source code (Wang et al., 2015, NOR-X-424), whereas cffdrs v1.9.2 computes it as 147.27723 (= 250 × 59.5/101; constant `FFMC_COEFFICIENT`, used in the FFMC and ISI functions). With the cffdrs coefficient set to 147.2 (same sample, 1 January–31 August 2025, 8,262 cell-days), the differences fall to storage precision:
+
+| Index | Max. absolute difference | 99th percentile |
+| --- | --- | --- |
+| FFMC | 1.1 × 10⁻⁵ | 7.6 × 10⁻⁶ |
+| ISI | 2.1 × 10⁻⁵ | 9.3 × 10⁻⁶ |
+| FWI | 5.1 × 10⁻⁵ | 2.5 × 10⁻⁵ |
+
+Command: `Rscript R/check_fwi_cffdrs.R data/interim/era5land_fwi/cffdrs_check_sample.csv 147.2`. xclim was used unmodified; the difference does not affect any decision of the 2025 case, because anomalies are standardised per cell. Script: `R/check_fwi_cffdrs.R`.
 
 **Comparison with the CEMS fire danger reanalysis.** The FWI computed from ERA5-Land (0.1°, continuous from 1 January 2017) was compared with the operational CEMS reanalysis (`cems-fire-historical-v1`, version 4_1, consolidated, ERA5, 0.25°) for August 2025, after averaging the 0.1° cells within each 0.25° cell (cells with ≥ 50% land). The comparison covers all ERA5-Land land cells of the study region box, 35.25–44.25° N, 10.25° W–4.75° E: 1,283 cells of 0.25° (39,773 cell-days), of which about 210 lie outside the Iberian Peninsula (France 104, Algeria 87, Morocco 18, Andorra 1; nearest country of the cell centre). Script: `python -m physiofire.preprocess.fwi_cems_compare`.
 

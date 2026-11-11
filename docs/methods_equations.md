@@ -327,9 +327,19 @@ $$
   | Implementación | Constante | Comprobación |
   | --- | --- | --- |
   | xclim 1.0.0 | **147,2** (Van Wagner, 1987) | Código fuente instalado |
-  | cffdrs 1.9.2 | **147,2772277** = 250 × 59,5 / 101 (`FFMC_COEFFICIENT`, código oficial revisado) | Espacio de nombres del paquete instalado |
+  | cffdrs 1.9.2 | **147,2772277** = 250 × 59,5 / 101 (`FFMC_COEFFICIENT`, calculada por el propio paquete; se usa en las funciones del FFMC y del ISI) | Espacio de nombres del paquete instalado |
 
-  Con 147,2 en cffdrs, las diferencias bajan a la precisión de almacenamiento (S1.10). xclim se usó sin modificar.
+  El código oficial actualizado (Wang et al., 2015, NOR-X-424) usa 147,2, como Van Wagner (1987).
+
+  **Con 147,2 en cffdrs**, las diferencias bajan a la precisión de almacenamiento. Misma muestra, repetido el 11 de noviembre de 2026 con `Rscript R/check_fwi_cffdrs.R <muestra> 147.2`:
+
+  | Índice | Diferencia máxima | Percentil 99 |
+  | --- | --- | --- |
+  | FFMC | 1,1 × 10⁻⁵ | 7,6 × 10⁻⁶ |
+  | ISI | 2,1 × 10⁻⁵ | 9,3 × 10⁻⁶ |
+  | FWI | 5,1 × 10⁻⁵ | 2,5 × 10⁻⁵ |
+
+  xclim se usó sin modificar.
 - **Muestra:** 34 celdas de ERA5-Land de 0,1°.
   - 30 aleatorias de tierra: `numpy.random.default_rng(42).choice` sobre las celdas con temperatura todos los días, en orden por filas.
   - 4 en los incendios de 2025, la celda más cercana a un punto aproximado de cada uno: Benuza (42,4° N, 6,4° O), A Rúa (42,3° N, 7,0° O), Navaconcejo (40,1° N, 5,9° O) y Carviçais (41,3° N, 6,9° O).
@@ -350,7 +360,7 @@ $$
   - `Rscript R/check_fwi_cffdrs.R` hace la comparación.
 - **Referencias:**
   - Wang, X., Wotton, B. M., Cantin, A. S., Parisien, M.-A., Anderson, K., Moore, B. & Flannigan, M. D. (2017). cffdrs: an R package for the Canadian Forest Fire Danger Rating System. *Ecological Processes* 6:5, doi:10.1186/s13717-017-0070-z; software cffdrs v1.9.2 (CRAN, 21 de agosto de 2025; https://github.com/cffdrs/cffdrs_r).
-  - Código revisado con 147,27723: Wang et al. (2015), Canadian Forest Service, Information Report NOR-X-424 **(verificar)**.
+  - Código oficial actualizado, con 147,2: Wang et al. (2015), Canadian Forest Service, Information Report NOR-X-424. El valor 147,27723 es el que calcula cffdrs v1.9.2.
   - xclim: Bourgault et al. (2023, JOSS) **(verificar)**.
 
 **Comparación con CEMS** (`python -m physiofire.preprocess.fwi_cems_compare`):
