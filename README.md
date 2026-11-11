@@ -32,6 +32,16 @@ renv::restore()
 - `docs/`: project documents, data source notes, selection criteria.
 - `notebooks/`, `figures/`, `tests/`.
 
+## Pre-registration tags
+
+Annotated git tags on the commits that fixed each analysis before any vegetation series was extracted (`git show <tag>`):
+
+| Tag | Commit (date) | Content |
+| --- | --- | --- |
+| `prereg-fire2025` | `a7f894f` (2026-11-08) | 2025 fire case: controls, thresholds, anomalies, masking and decision criterion. Fire sample fixed by rule earlier in `47e6488` (2026-11-07; `data/fires/selected_fires.csv`) |
+| `prereg-timescale` | `76ae9af` (2026-11-08) | Question 1 (drought time scale): plan and criterion in `c84924c` (`docs/plan_q1_drought.md`, config `drought_q1`); final configuration (SPEI clipping, implementation details) in `76ae9af` |
+| `prereg-onset` | `d093008` (2026-11-08) | Q1b (drought onset, post hoc follow-up of question 1): plan `docs/plan_q1b.md` and config `drought_q1b` |
+
 ## Credentials
 
 Not stored in the repository: NASA Earthdata (`~/_netrc` on Windows or `earthaccess.login()`), Copernicus CDS (`~/.cdsapirc`).
