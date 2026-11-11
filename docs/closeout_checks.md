@@ -54,9 +54,15 @@ En las 79 celdas `wet_heath` del caso 2025 (quemadas y controles), las fraccione
 
 El nombre "heathland/brezal" que usamos no se corresponde con el subtipo dominante. En el noroeste ibérico esta clase coincide con matorral atlántico de brezo y tojo sobre suelos húmedos o turbosos de montaña, pero eso es una interpretación, **no algo que diga el producto**.
 
-Hay que verificar en el *Product User Manual* (`data/raw/fireurisk_fuel/yabycn_v2/PUM_FirEUrisk_European_fuel_map.pdf`, tabla de tipos) la redacción exacta de la leyenda. No he podido extraer el texto del PDF en este equipo.
+**Leyenda verificada** por el investigador el 11 de noviembre de 2026 en la tabla 1 de Aragoneses et al. (2023):
+- 51/52/53: "Wet and peat/semi-peat land – tree / shrubland / grassland";
+- 61: "Urban continuous fabric";
+- 62: "Urban discontinuous fabric";
+- 7: "Nonfuel".
 
-Propuesta para el texto: "wet and peat-land fuels (FirEUrisk types 51–53; mostly Atlantic heath on wet soils in NW Iberia)" o similar, después de verificarlo.
+Los comentarios de `config.yaml` (`epoch.fuel.types`) usan esos nombres.
+
+Propuesta para el texto: "wet and peat-land fuels (FirEUrisk types 51–53; mostly Atlantic heath on wet soils in NW Iberia)" o similar.
 
 Las 175 celdas de la pregunta 1 con esta clase son casi todas húmedas: 156 húmedas, 12 subhúmedas secas y 7 semiáridas.
 
