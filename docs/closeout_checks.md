@@ -247,3 +247,34 @@ Matiz para Métodos (caso 2025): la cadena de SIF/APAR se cerró antes de fijar 
 - `LC_MASK` de TROPOSIF (MCD12C1 de 2018; filtro de nieve y suelo desnudo).
 
 **Descargados pero fuera de los resultados:** NBAR de MCD43A4 y fPAR de VNP15A2H (sensibilidades), focos de MODIS C6.1 y MCD12C1 como clasificación. Natural Earth solo se usa en el mapa de la Fig. 1.
+
+## 10. Antelación L del caso 2025: criterio conjunto, solo magnitud e intervalo bootstrap (11 de noviembre de 2026)
+
+Fuente: `data/processed/epoch/report2025_lead_times.csv` (`R/epoch_report_2025.R`); sin cálculos nuevos.
+
+- **L conjunto** (`lead_days`, valor puntual del manuscrito): media ≥ 0,5 DE en el signo esperado **y** intervalo diario sin el 0, todos los días hasta el día −1 (`lead_time()` en `R/epoch_lib.R`).
+- **L magnitud** (`lead_mean_rule`): la misma regla sin la condición del intervalo, en la muestra completa.
+- **IC 95 % bootstrap:** incendios remuestreados con reemplazo (B = `epoch.bootstrap_n`, semilla `random_seed`); en cada réplica, L con el criterio de **solo magnitud** (`lead_boot()`). Siempre es así, en todas las filas.
+
+| Grupo | Variable | Medida | n | L conjunto | L magnitud | IC 95 % | Réplicas con L > 0 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Todos | FWI | celdas quemadas | 22 | 12 | 12 | [8, 17] | 100 % |
+| Todos | AED | celdas quemadas | 22 | 7 | 7 | [3, 10] | 99,3 % |
+| Matorral | FWI | celdas quemadas | 15 | 6 | 6 | [0, 17] | 92,8 % |
+| Matorral | AED | celdas quemadas | 15 | 4 | 4 | [0, 11] | 53 % |
+| Brezal | SIF/APAR (sin persistencia, principal) | celdas quemadas | 7 | 8 | 8 | [4, 11] | 99,8 % |
+| Brezal | SIF/APAR (persistencia de 5 días) | celdas quemadas | 7 | 7 | 7 | [4, 11] | 100 % |
+| Brezal | EVI | celdas quemadas | 7 | 17 | 17 | [1, 19] | 98,8 % |
+| Brezal | FWI | celdas quemadas | 7 | 14 | 14 | [12, 60] | 100 % |
+| Brezal | AED | celdas quemadas | 7 | 7 | 8 | [5, 10] | 100 % |
+
+**Diferencia incendio–control:** L = 0 en todas las variables y grupos, con los dos criterios. El intervalo es [0, 0] salvo el FWI en brezal: [0, 5], con un 13,8 % de réplicas con L > 0.
+
+**Resultado:**
+- Los dos criterios coinciden en todos los casos menos uno: la AED en brezal (7 con el conjunto, 8 con el de magnitud).
+- Ningún valor puntual del criterio conjunto cae fuera de su intervalo.
+- El valor puntual y el intervalo no salen de la misma regla. Conviene decirlo en métodos: el intervalo describe la variabilidad entre incendios de la regla de magnitud.
+
+**Notas para la redacción:**
+1. **FWI en brezal, [12, 60]: límite superior censurado.** 60 es el principio de la ventana (día −60). En el 2,5 % superior de las réplicas, el FWI de las celdas quemadas está ≥ 0,5 DE durante toda la ventana, así que el límite real puede ser mayor; es una cota, no una estimación.
+2. **Matorral, FWI [0, 17] y AED [0, 11]: límite inferior en 0.** Una parte de las réplicas no da ninguna antelación: el 7 % en el FWI y el 47 % en la AED. La antelación de la AED en matorral (4 días) no es robusta.
