@@ -5,7 +5,9 @@ Steps:
           burned cells of August 2025 fires (3 largest per country) with 2 controls each, and shrubland cells of the
           largest summer-2022 drought events (definition B of Q1b). Writes explore_cells.csv; the SPEI of their
           ERA5-Land cells is then computed with R/explore_spei.R (same method and reference as question 1).
-  series  daily series with drought_q1.build_series (same screening, spike filter and SPEI as question 1); burned
+  series  daily series with drought_q1.build_series (same screening, spike filter and SPEI as question 1); for the
+          fire cells (burned and controls) SIF/APAR is recomputed as in the epoch analysis (fPAR composites cut at
+          the ignition before interpolation, no persistence; causal_sif_apar); burned
           cells masked from the ignition date (included) before any anomaly; median-by-DOY anomalies
           (2018-2025), backward 15-day mean, both the smoothed and the daily anomaly divided by the SD of the
           smoothed anomaly of the cell (whole period). Writes explore_series.csv (long; case-year April-October).
@@ -84,11 +86,49 @@ def select_cells(cfg: dict) -> pd.DataFrame:
     return cells
 
 
+def causal_sif_apar(cfg: dict, cells: pd.DataFrame, ds) -> None:
+    """Replace SIF/APAR of the fire cells (burned and controls) in `ds` by the causal version of the epoch analysis
+    (Fig. 2): fPAR composites ending on or after the fire's ignition removed BEFORE the daily interpolation, no
+    persistence (epoch.sif_apar_causal with persist_days=None), so SIF/APAR is missing from the last valid composite
+    centre onwards and from the ignition date on. Then the same screening and spike filter as build_series.
+    Drought cells keep the question 1 series."""
+    from physiofire import epoch
+    q, scfg, acfg = cfg["drought_q1"], cfg["sif_apar"], cfg["anomalies"]
+    j = np.where(cells["case_type"].to_numpy() == "fire")[0]
+    if not j.size:
+        return
+    inp = epoch.open_inputs(dict(cfg, epoch=dict(cfg["epoch"], optical_sensitivity=False)), q["cells"]["grid"])
+    ref = inp["sif"]["sif"]
+    days = ds["time"].values.astype("datetime64[D]")
+    iy, ix = cells["iy"].to_numpy()[j], cells["ix"].to_numpy()[j]
+    sif = epoch._extract(ref, ref, iy, ix, days)
+    w = epoch._extract(inp["sif"]["weight_sum"], ref, iy, ix, days)
+    par = epoch._extract(inp["par"]["par"], ref, iy, ix, days)
+    fp = inp["fpar"]
+    comp = epoch._extract(fp["fpar"], ref, iy, ix, None)
+    mark = cells["marker_date"].to_numpy()[j]
+    new = np.full((days.size, j.size), np.nan)
+    for ign in np.unique(mark):
+        k = np.where(mark == ign)[0]
+        ratio, fpar_d = epoch.sif_apar_causal(sif[:, k], par[:, k], comp[:, k], fp.time.values,
+                                              fp.time_center.values, days, np.datetime64(ign, "D"),
+                                              int(scfg["fpar_composite_days"]), float(scfg["fpar_max_gap_days"]),
+                                              None)
+        m = epoch.screening_mask(scfg, fpar_d, par[:, k], w[:, k])
+        new[:, k] = ratio if m is None else np.where(m, ratio, np.nan)
+    new, _ = anomalies.spike_filter(new, int(acfg["spike_half_window"]), float(acfg["spike_k"]),
+                                    int(acfg["spike_min_neighbours"]))
+    vals = ds["sif_apar"].values.astype(float)
+    vals[:, j] = new
+    ds["sif_apar"] = (("time", "cell"), vals.astype("f4"))
+
+
 def series_table(cfg: dict, cells: pd.DataFrame) -> pd.DataFrame:
     et, q = cfg["explore_timeseries"], cfg["drought_q1"]
     qa = q["anomalies"]
     c = dict(cfg, drought_q1=dict(q, spei=dict(q["spei"], out_dir=et["out_dir"], scales_days=[90])))
     ds = q1.build_series(c, cells)
+    causal_sif_apar(cfg, cells, ds)
     days = ds["time"].values.astype("datetime64[D]")
     burned = (cells["role"] == "burned").to_numpy()
     mark = cells["marker_date"].to_numpy().astype("datetime64[D]")
