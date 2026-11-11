@@ -320,6 +320,49 @@ $$
 
 - En los análisis, cada celda de 0,05° toma el FWI de la celda de 0,1° que la contiene (`epoch.py::_extract`, vecino más cercano).
 
+**Validación con cffdrs** (11 de noviembre de 2026; `docs/supplementary_qc.md`, S1.10):
+
+- **Única diferencia de implementación: la constante del FFMC** en la conversión entre el FFMC y la humedad del combustible fino (Ec. 1 y 10 de Van Wagner, 1987).
+
+  | Implementación | Constante | Comprobación |
+  | --- | --- | --- |
+  | xclim 1.0.0 | **147,2** (Van Wagner, 1987) | Código fuente instalado |
+  | cffdrs 1.9.2 | **147,2772277** = 250 × 59,5 / 101 (`FFMC_COEFFICIENT`, código oficial revisado) | Espacio de nombres del paquete instalado |
+
+  Con 147,2 en cffdrs, las diferencias bajan a la precisión de almacenamiento (S1.10). xclim se usó sin modificar.
+- **Muestra:** 34 celdas de ERA5-Land de 0,1°.
+  - 30 aleatorias de tierra: `numpy.random.default_rng(42).choice` sobre las celdas con temperatura todos los días, en orden por filas.
+  - 4 en los incendios de 2025, la celda más cercana a un punto aproximado de cada uno: Benuza (42,4° N, 6,4° O), A Rúa (42,3° N, 7,0° O), Navaconcejo (40,1° N, 5,9° O) y Carviçais (41,3° N, 6,9° O).
+  - Del 1 de enero al 31 de agosto de 2025: 243 días por celda, 8262 celdas-día.
+- **Arranque:** xclim y cffdrs arrancan los dos el **1 de enero de 2025** con FFMC 85, DMC 6 y DC 15. Es una ejecución corta solo para la validación; el análisis usa la serie continua desde 2017.
+  - cffdrs se ejecuta con `fwi(…, batch = TRUE, lat.adjust = TRUE)` y las mismas entradas de mediodía.
+- **Resultado** (reproducido el 11 de noviembre de 2026):
+
+  | Índice | Diferencia máxima | Percentil 99 |
+  | --- | --- | --- |
+  | FWI | **1,72** (en agosto) | 0,66 |
+  | ISI | 0,75 | 0,30 |
+  | FFMC | 0,43 | 0,18 |
+  | DMC, DC y BUI | ≤ 0,0004 | |
+
+- **Código:**
+  - `python -m physiofire.preprocess.fwi_cffdrs_sample` reconstruye la muestra. El código original era ad hoc, se recuperó del registro de la sesión y se ha versionado; reproduce la muestra existente con diferencia 0.
+  - `Rscript R/check_fwi_cffdrs.R` hace la comparación.
+- **Referencias:**
+  - Wang, X., Wotton, B. M., Cantin, A. S., Parisien, M.-A., Anderson, K., Moore, B. & Flannigan, M. D. (2017). cffdrs: an R package for the Canadian Forest Fire Danger Rating System. *Ecological Processes* 6:5, doi:10.1186/s13717-017-0070-z; software cffdrs v1.9.2 (CRAN, 21 de agosto de 2025; https://github.com/cffdrs/cffdrs_r).
+  - Código revisado con 147,27723: Wang et al. (2015), Canadian Forest Service, Information Report NOR-X-424 **(verificar)**.
+  - xclim: Bourgault et al. (2023, JOSS) **(verificar)**.
+
+**Comparación con CEMS** (`python -m physiofire.preprocess.fwi_cems_compare`):
+- **Producto:** `cems-fire-historical-v1`, versión 4_1, consolidado, 0,25°. Días: los 31 de agosto de 2025.
+- **Emparejamiento de rejillas:**
+  - cada celda de 0,1° se asigna a la celda de 0,25° que contiene su centro (centros en múltiplos de 0,25°; 4, 6 o 9 subceldas por celda);
+  - se compara el promedio de las subceldas con dato, calculado en dos pasos: primero sobre las filas y después entre columnas, no como media simple;
+  - solo entran las celdas de 0,25° con al menos un 50 % de subceldas de tierra.
+- **Celdas:** 1283 celdas de 0,25° (39 773 celdas-día) en la región **35,25–44,25° N, 10,25° O–4,75° E**.
+  - Incluye toda la tierra de ERA5-Land del recuadro, no solo la Península: España 868, Portugal 205, Francia 104, Argelia 87, Marruecos 18 y Andorra 1. El país es aproximado en la costa.
+- **Resultado:** FWI r = 0,986, sesgo −1,6 y MAE 2,4.
+
 ---
 
 ## Detalles que afectan a la reproducibilidad y no estaban en el borrador
