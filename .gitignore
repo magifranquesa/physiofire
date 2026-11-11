@@ -47,6 +47,7 @@ desktop.ini
 .vscode/
 !data/processed/drought_q1/
 data/processed/drought_q1/*
+!data/processed/drought_q1/README.md
 !data/processed/drought_q1/hypotheses.csv
 !data/processed/drought_q1/decision.json
 !data/processed/drought_q1/analysis2_episodes.csv

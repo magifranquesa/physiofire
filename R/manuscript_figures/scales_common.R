@@ -13,7 +13,7 @@ MAIN_V <- c("sif_apar", "ndvi", "evi"); SEC_V <- c("sif", "sif_par", "fpar")
 # fuel classes of the figure: closed and open forest merged as "Forest" (as the forest stratum in panel c)
 FUEL_FIG <- c(closed_forest = "Forest", open_forest = "Forest", shrubland = "Shrubland", wet_heath = "Heathland",
               grassland = "Grassland")
-ARID_LAB <- c(semiarid = "Semi-arid", dry_subhumid = "Dry sub-humid", humid = "Humid")
+ARID_LAB <- c(semiarid = "Arid to semi-arid", dry_subhumid = "Dry sub-humid", humid = "Humid")
 
 scale_cells <- read_csv(file.path(root, "data/processed/drought_q1/analysis1_cells.csv"), show_col_types = FALSE) |>
   filter(explanatory == "spei", !is.na(scale_days), (variable %in% MAIN_V & p < alpha) | variable %in% SEC_V) |>

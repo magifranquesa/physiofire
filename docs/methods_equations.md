@@ -464,3 +464,21 @@ $$
 **TROPOSIF.**
 - Versión: L2B, procesador **01.00.01**, colección **03** (S5P-PAL/UPV). Comprobado en los atributos de los 3104 archivos diarios del 1 de mayo de 2018 al 3 de noviembre de 2026; no hay ninguna otra versión.
 - Sin días perdidos en 2018–2025.
+
+---
+
+## Clases de aridez (11 de noviembre de 2026)
+
+- **Índice:** $\mathrm{AI}=P/ET_0$ del Global-AI v3.1 (1970–2000). Cada celda de 0,05° toma la **media** de sus 6 × 6 píxeles de 30″, sin los valores 0 y 65535 (`preprocess/aridity.py`). Se usa el índice, es decir, el valor almacenado × 0,0001.
+- **Clases** (`R/q1_lib.R::aridity_class`, intervalos [inferior, superior)):
+
+  | Clase | Intervalo | Celdas de la pregunta 1 |
+  | --- | --- | --- |
+  | `semiarid` | AI < 0,5 | 4000 |
+  | `dry_subhumid` | 0,5 ≤ AI < 0,65 | 1002 |
+  | `humid` | AI ≥ 0,65 | 1769 |
+
+- **La primera clase incluye 53 celdas áridas (AI < 0,2): 39 de matorral y 14 de pastizal.**
+  - Mínimos por estrato: pastizal 0,150, matorral 0,165, bosque 0,265 y brezal 0,358. Ninguna celda de bosque ni de brezal baja de 0,2.
+  - Por eso las figuras la llaman "Arid to semi-arid" (Fig. 4b y S4b). Ni las clases ni los resultados cambian.
+- **Caso 2025:** no usa las clases, sino el índice continuo: un control es válido si |AI_control − AI_quemadas| / AI_quemadas ≤ 0,15.
