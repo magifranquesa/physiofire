@@ -324,3 +324,67 @@ Fuente: `data/processed/drought_q1/hypotheses.csv`.
 - **Cómo quedan fuera:** su correlación es NaN en todas las variables, así que no son significativas y no entran en H1, H2 ni H3.
 - **Celdas efectivas: 6751.** Es la misma cifra que el "6751 de 6771" de `docs/results_q1_drought.md`.
 - **Comprobación:** solo lectura de `drought_q1_series.nc` y `analysis1_cells.csv`; no cambia ningún resultado.
+
+## 12. Q1b: inicio de sequía, eventos, signo, censura y sensibilidades (11 de noviembre de 2026)
+
+Código: `src/physiofire/drought_q1b.py` y `drought_q1.py`; config `drought_q1b`. Resultados: `data/processed/drought_q1b/hypotheses_q1b.csv` y `decision_q1b.csv`.
+
+### Definición B del inicio (`onsets_rapid()`)
+
+Un día *i* es inicio candidato si cumple las tres condiciones:
+1. **Umbral:** SPEI-90 del día *i* < −1,0 (estricto).
+2. **Duración:** sigue por debajo de −1,0 al menos 30 días seguidos desde el día *i*, incluido.
+3. **Caída:** máximo del SPEI-90 en los 30 días previos (*i* − 30 a *i* − 1) − SPEI-90 del día *i* ≥ 1,0, sin importar el nivel de partida.
+
+Después del filtro:
+- **Separación:** de dos candidatos de una celda a menos de 90 días se queda el primero.
+- **Ventana:** mes de inicio de marzo a septiembre, y ventana de respuesta (día −30 a +90, más 15 días) dentro del periodo con datos.
+
+### Estaciones (`event_season()`)
+
+- Primavera: marzo–mayo. Verano: junio–septiembre.
+- La estación es la del **evento**, no la de cada celda: la mediana, redondeada, del mes de inicio de sus celdas.
+- Como los inicios solo pueden ser de marzo a septiembre, no hay eventos fuera de esas dos estaciones.
+
+### Eventos y estrato
+
+- **Formación de eventos** (`build_events()`, sobre todos los episodios):
+  - se unen celdas vecinas (las 8 de alrededor) con inicios separados como mucho ±15 días;
+  - las celdas pueden ser de **cualquier clase** (bosque, matorral, brezal o pastizal);
+  - el mínimo de **≥ 10 celdas distintas** cuenta todas las clases.
+- **Comparación:** usa **solo las celdas del estrato** dentro de esos eventos (`_strata_rows()`). En el estrato matorral son las de matorral y las de brezal.
+- **Cuándo H3b es evaluable:** con ≥ 10 eventos que tengan al menos una pareja informativa del estrato.
+
+### Signo y censura (`pair_scores()`, `h3b_test()`)
+
+- **Signo:** *d* = T(SIF/APAR) − T(referencia), en días respecto al inicio. Un **valor negativo indica que SIF/APAR responde antes**.
+- **Puntuación:** −1 si SIF/APAR responde antes, +1 si responde después, 0 si empatan.
+- **Censura simple (una variable no responde en −30…+90):**
+  - si es la referencia la que no responde: *d* = T(SIF/APAR) − 90 y puntuación −1;
+  - si es SIF/APAR: *d* = 90 − T(referencia) y puntuación +1.
+
+  Es decir, **T = +90 entra en *d* como cota**.
+- **Censura doble:** la pareja se cuenta pero no se usa (no informativa).
+- **Agregación:**
+  - dentro de cada evento, la media de la puntuación y la mediana de *d*;
+  - entre eventos, la media de las puntuaciones (bootstrap por eventos) y la mediana de las medianas.
+- **Criterio:** media < 0, límite superior < 0 y mediana de *d* ≤ −5 días.
+
+### Sensibilidades en `hypotheses_q1b.csv`
+
+| Sensibilidad | Pruebas con resultado | Nota |
+| --- | --- | --- |
+| Corregida por el PAR con media centrada | H1 y H2b (`H1_centred_sens`, `H2b_centred_sens`) | **No existe para H3b.** En el análisis 1b, SIF/APAR va corregido por el PAR con los dos suavizados |
+| Igualada en ruido | Solo H1 (`H1_robust_noise`; 5 réplicas, la de fracción mediana) | No existe para H2b ni para H3b |
+| Correlación parcial dado el PAR | H1 (`H1_partial_sens`) | — |
+| Media hacia atrás con corrección por el PAR | H3b (`H3b_backward_par_corrected_sens`) | **Es la única sensibilidad de H3b.** Cambia el suavizado y la corrección a la vez (`docs/results_q1b.md`, sección (a)) |
+
+| Matorral | H1 corr. | H1 ruido | H1 centrada | H1 parcial | H2b | H2b centrada | H3b | H3b hacia atrás |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Frente al NDVI | sí | sí | sí | sí | no | no | no | no |
+| Frente al EVI | sí | sí | sí | sí | sí (−6) | sí (−5) | no | no |
+
+**Ninguna sensibilidad cambia el criterio.**
+- H3b no se cumple en ningún caso.
+- La decisión es "contraria" en todos los estratos.
+- En los estratos que no deciden, la única diferencia con el análisis principal es descriptiva: en el brezal solo, frente al NDVI, se cumple H1 parcial y no H1 corregido.
