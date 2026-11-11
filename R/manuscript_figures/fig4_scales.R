@@ -36,7 +36,7 @@ pc <- ggplot(h, aes(fraction, stratum, colour = against)) +
   geom_point(size = 1.4, position = pd) +
   scale_colour_manual(values = VAR_COL, name = "SIF/APAR vs") +
   scale_x_continuous(limits = c(0.25, 1), breaks = seq(0.3, 1, 0.1)) +
-  labs(x = "Fraction of cells with a shorter SIF/APAR scale (H1)", y = NULL) + theme_ms() +
+  labs(x = "Fraction of cells with a shorter SIF/APAR scale", y = NULL) + theme_ms() +
   theme(legend.position = "bottom", legend.margin = margin(0, 0, 0, 0))
 
 p <- pa / (pb + pc + plot_layout(widths = c(1.6, 1))) + plot_layout(heights = c(1, 1)) + tags_abc()
