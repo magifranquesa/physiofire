@@ -20,7 +20,7 @@ print(as.data.frame(shr |> filter(variable == "sif_apar") |> group_by(aridity_cl
 pa <- share_panel(main_cells |> filter(fuel_class %in% names(FUEL_FIG)) |> mutate(fuel = FUEL_FIG[fuel_class]),
                   "fuel", unique(FUEL_FIG), y_lab = YLAB) + guides(fill = guide_legend(nrow = 1))
 pb <- share_panel(shr |> mutate(arid = ARID_LAB[aridity_class]), "arid", ARID_LAB,
-                  title = "Shrubland and heathland, by aridity class", y_lab = YLAB) +
+                  title = "Shrubland stratum by aridity class", y_lab = YLAB) +
   theme(legend.position = "none")
 
 st_lab <- c(shrubland = "Shrubland\nstratum", forest = "Forest", grassland = "Grassland\n(reference)",
