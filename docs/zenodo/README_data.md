@@ -2,7 +2,7 @@
 
 Derived datasets supporting the study *Drought sensitivity versus anticipation: satellite chlorophyll fluorescence and fire-prone conditions in the Iberian Peninsula* (Franquesa et al., in preparation). The analysis code, configuration and the small result tables are in the companion code record (GitHub `magifranquesa/physiofire`, archived on Zenodo); this record holds the larger intermediate products that the code reads, so that the analyses can be re-run without downloading the original satellite and reanalysis data.
 
-Version 1.0.0, 12 November 2026. Code commit: see the Zenodo code record of the same version.
+Version 1.0.0, 12 November 2026. Code record: https://doi.org/10.5281/zenodo.24179252 (concept DOI; v1.0.0 is https://doi.org/10.5281/zenodo.24179253).
 
 ## How to use
 

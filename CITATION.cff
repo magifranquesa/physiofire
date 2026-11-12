@@ -29,9 +29,10 @@ keywords:
   - fire danger
   - Fire Weather Index
   - Iberian Peninsula
-# identifiers:
-#   - type: doi
-#     value: 10.5281/zenodo.XXXXXXX   # Zenodo concept DOI (all versions), after the first release
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.24179252   # Zenodo concept DOI (resolves to the latest version)
+    description: "Zenodo archive of the code (all versions)"
 # preferred-citation:
 #   type: article
 #   title: "Drought sensitivity versus anticipation: satellite chlorophyll fluorescence and fire-prone conditions in the Iberian Peninsula"

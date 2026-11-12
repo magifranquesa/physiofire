@@ -11,7 +11,7 @@ The study asks whether satellite solar-induced chlorophyll fluorescence normalis
 Main result: SIF/APAR tracks drought at shorter accumulation scales than greenness, but it does not respond earlier at drought onset and did not separate burned from unburned vegetation before the 2025 fires.
 
 - Article: *in preparation* (reference and DOI will be added here).
-- Code archive: Zenodo (DOI to be added at the first release).
+- Code archive: Zenodo, concept DOI [10.5281/zenodo.24179252](https://doi.org/10.5281/zenodo.24179252) (always the latest version; v1.0.0 = [10.5281/zenodo.24179253](https://doi.org/10.5281/zenodo.24179253)).
 - Derived datasets (~2 GB): Zenodo data record described in [`docs/zenodo/README_data.md`](docs/zenodo/README_data.md).
 
 ## Pre-registration
