@@ -388,3 +388,25 @@ Después del filtro:
 - H3b no se cumple en ningún caso.
 - La decisión es "contraria" en todos los estratos.
 - En los estratos que no deciden, la única diferencia con el análisis principal es descriptiva: en el brezal solo, frente al NDVI, se cumple H1 parcial y no H1 corregido.
+
+## 13. Fig. 3 y S3: efecto del filtro de picos al cortar el fPAR (12 de noviembre de 2026)
+
+**Contexto.**
+- Desde `9ac80b0`, SIF/APAR de las celdas de incendios de la Fig. 3 y las S3_1 a S3_5 se calcula como en la Fig. 2: compuestos de fPAR cortados en la ignición antes de interpolar, sin persistencia.
+- Desde `ce3c66e`, los controles toman la serie sin corte a partir de la ignición. La celda quemada sigue enmascarada desde la ignición.
+
+**El efecto.** El filtro de picos (`anomalies.spike_filter`, tipo Hampel) calcula su escala de ruido (1,4826 × mediana del residuo absoluto) con **toda la serie de la celda**.
+- Al cortar el fPAR desaparecen los valores de SIF/APAR posteriores a la ignición de 2025, y esa escala cambia ligeramente.
+- Los valores que estaban justo en el límite pueden pasar a eliminarse, también lejos de la ignición.
+- No cambia ningún parámetro: es una consecuencia del corte.
+
+| Celda | Fecha | Qué cambia | Efecto en la media de 15 días |
+| --- | --- | --- | --- |
+| Benuza, quemada (S3_2) | 3 de junio de 2025 (día −66) | Se elimina un valor diario de **+12,4 DE** | Del 3 al 17 de junio baja en torno a 1,3 DE (de unos +1,6 a +2,3 a unos +0,3 a +1,1) |
+| Alverca da Beira, quemada (S3_5) | 1–3 de abril de 2025 (días −135 a −133) | El mismo mecanismo (el valor eliminado está fuera del intervalo dibujado) | Baja 1,06 DE (de +1,01 a −0,06) |
+
+- **En el resto de celdas y días** el cambio es mínimo: mediana de 0,001–0,003 DE fuera de la ventana de la ignición.
+- **Lo que sí cambia, por diseño:** los últimos 2–5 días antes de la ignición (hasta +0,44 DE en las quemadas) y, en los controles, los días posteriores a la ignición.
+- **Valoración:** el valor eliminado en Benuza es claramente un pico, así que la versión actual es razonable. Se anota porque cambia visiblemente la S3_2 respecto a la versión anterior al 11 de noviembre.
+
+Comprobación: comparación de `explore_series.csv` antes de `9ac80b0` y después de `ce3c66e`; solo lectura.
