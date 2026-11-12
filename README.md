@@ -12,7 +12,7 @@ Main result: SIF/APAR tracks drought at shorter accumulation scales than greenne
 
 - Article: *in preparation* (reference and DOI will be added here).
 - Code archive: Zenodo, concept DOI [10.5281/zenodo.24179252](https://doi.org/10.5281/zenodo.24179252) (always the latest version; v1.0.0 = [10.5281/zenodo.24179253](https://doi.org/10.5281/zenodo.24179253)).
-- Derived datasets (~2 GB): Zenodo data record described in [`docs/zenodo/README_data.md`](docs/zenodo/README_data.md).
+- Derived datasets (~2 GB): Zenodo data record, concept DOI [10.5281/zenodo.24179626](https://doi.org/10.5281/zenodo.24179626) (v1.0.0 = [10.5281/zenodo.24179627](https://doi.org/10.5281/zenodo.24179627)), described in [`docs/zenodo/README_data.md`](docs/zenodo/README_data.md).
 
 ## Pre-registration
 
@@ -96,7 +96,7 @@ Steps 1–2 take days of downloads. The Zenodo data record contains the outputs 
 ## Data
 
 - **Original datasets**: obtained from their providers; versions and access links in `docs/supplementary_table_S3.md`. The repository stores none of them.
-- **Derived datasets** (daily series of the analysis cells, SPEI inputs, gridded SIF/APAR of summer 2025): Zenodo data record (CC BY 4.0), see `docs/zenodo/README_data.md`.
+- **Derived datasets** (daily series of the analysis cells, SPEI inputs, gridded SIF/APAR of summer 2025): Zenodo data record https://doi.org/10.5281/zenodo.24179626 (CC BY 4.0), see `docs/zenodo/README_data.md`.
 - **Result tables** small enough to version are in `data/processed/` (see `.gitignore` for the list).
 
 ## Credentials

@@ -16,6 +16,7 @@ authors:
   - family-names: Franquesa
     given-names: Magí
     affiliation: "Instituto Pirenaico de Ecología (IPE-CSIC), Zaragoza, Spain"
+    orcid: "https://orcid.org/0000-0003-3101-0394"
 repository-code: "https://github.com/magifranquesa/physiofire"
 license: MIT
 version: 1.0.0
@@ -33,6 +34,9 @@ identifiers:
   - type: doi
     value: 10.5281/zenodo.24179252   # Zenodo concept DOI (resolves to the latest version)
     description: "Zenodo archive of the code (all versions)"
+  - type: doi
+    value: 10.5281/zenodo.24179626   # Zenodo concept DOI of the derived datasets
+    description: "Zenodo archive of the derived datasets (all versions)"
 # preferred-citation:
 #   type: article
 #   title: "Drought sensitivity versus anticipation: satellite chlorophyll fluorescence and fire-prone conditions in the Iberian Peninsula"
