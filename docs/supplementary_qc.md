@@ -1,6 +1,6 @@
 # Supplementary Section S1. Data quality control
 
-*Supplementary material of the methods draft (`docs/methods_draft_RSE.md`), formatted for* Remote Sensing of Environment. *Last updated: 7 November 2026. Figures and tables referred to as `figures/qc/*` are in the project repository.*
+*Supplementary material of the manuscript, formatted for* Remote Sensing of Environment. *Last updated: 7 November 2026. Figures and tables referred to as `figures/qc/*` are in the project repository.*
 
 This section documents the checks applied to the input data and the tests of the processing chain. None of them used time series at the locations of the selected fires: unless stated otherwise, they were run over the whole study area or at generic points chosen by a fixed rule (S1.9).
 

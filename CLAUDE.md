@@ -1,19 +1,6 @@
 # PHYSIOFIRE – Prueba de concepto
 
-> **IDIOMA: RESPONDE SIEMPRE EN CASTELLANO.** Vale para todo lo que lee el investigador: respuestas finales, mensajes intermedios entre herramientas, preguntas, opciones, resúmenes y planes. También después de leer documentación, salidas de herramientas o informes de subagentes en inglés: antes de escribir, vuelve al castellano. Solo el código, los nombres de variables, los comentarios en el código y los mensajes de commit van en inglés.
-
-Este archivo da contexto a Claude Code sobre el proyecto. Léelo entero antes de proponer o escribir código. La sección "Objetivo de la prueba de concepto" manda sobre todo lo demás.
-
-## Cómo trabajar conmigo
-
-- Comunícate en español. Código, nombres de variables y comentarios en el código, en inglés.
-- Soy investigador postdoctoral (doctorado en 2022) en el Instituto Pirenaico de Ecología (IPE-CSIC). Sé teledetección y Python, pero explica brevemente las decisiones metodológicas y de diseño.
-- No inventes nombres de productos, versiones, variables ni URLs. Si no estás seguro de un dataset o de su acceso, dilo y propón cómo verificarlo. Varias fuentes de abajo están marcadas como **(verificar)**.
-- Prioriza pasos pequeños y comprobables: descarga una muestra, inspecciona las variables y luego escala.
-- Antes de descargas grandes, estima el volumen y pregúntame.
-- Infraestructura mínima: construye solo lo que necesita el análisis de la prueba de concepto.
-- Entorno: Windows. Miniconda en `C:\ProgramData\miniconda3` (fuera del PATH; llamarlo por ruta completa). Usar conda-forge. Entorno conda `physiofire` solo para Python. R (4.6.1 de CRAN, en `C:\Users\08856958A\AppData\Local\Programs\R\R-4.6.1`) con renv y `renv.lock`; no meter R en conda (r-terra no se mantiene en conda-forge para Windows).
-- Lenguajes: el investigador trabaja habitualmente en R. Figuras y todo el código para publicar (tabla de incendios, época superpuesta, estadística) en R, salvo que otro lenguaje sea mejor o imprescindible. Python para descarga y procesado de rejillas (earthaccess, cdsapi, earthengine-api, xarray, rejillado de TROPOMI). Intercambio en NetCDF (CF) y CSV.
+Este archivo da contexto a Claude Code (y a cualquier lector) sobre el proyecto: objetivo, estado de las preguntas, reglas metodológicas, datos y decisiones. Las instrucciones personales de trabajo están en `CLAUDE.local.md` (fuera de git). Léelo entero antes de proponer o escribir código. La sección "Objetivo de la prueba de concepto" manda sobre todo lo demás.
 
 ## Objetivo científico
 
@@ -22,8 +9,6 @@ Evaluar si el estado fisiológico de la vegetación observado desde satélite pe
 **Hipótesis:** la anomalía de SIF/APAR (rendimiento aparente de fluorescencia) anticipa el secado del combustible vivo y aporta información sobre el peligro de incendio que no está ya contenida en el FWI y la demanda evaporativa atmosférica (AED), con antelación de días a 1–2 semanas, sobre todo en matorral y arbolado.
 
 **Motivación:** el FWI usa solo meteorología y no observa la vegetación viva. Los productos de humedad del combustible vivo (LFMC) y los índices ópticos detectan el estrés tarde.
-
-**Para qué sirve el resultado:** un artículo con el investigador como autor de correspondencia (envío hacia mayo–junio de 2027), resultados preliminares para una beca MSCA postdoctoral (cierre habitual en septiembre de 2027) y un resumen para la EGU (plazo habitual en enero de 2027).
 
 ## Objetivo actual: pregunta 1 cerrada (negativa); Q1b cerrada (contraria)
 
@@ -275,9 +260,3 @@ Stack: Python 3.11 (`environment.yml`) con xarray, dask, rioxarray, zarr, netCDF
 - Fuente de la cartografía de Portugal, o EFFIS para ambos países.
 - Fuente meteorológica del análisis principal (ERA5-Land, o AEMET + IPMA).
 - Arbolado en el caso 2025 (ver "Decisiones tomadas").
-
-## Contexto adicional
-
-- Colaboradores potenciales: Sergio Vicente-Serrano (IPE-CSIC, sequía y demanda evaporativa atmosférica), Wouter H. Maes (UAV Research Centre, Universidad de Gante, fluorescencia), Diego G. Miralles (H-CEL, Universidad de Gante, GLEAM) y el equipo de EFFIS en el JRC.
-- La misión FLEX de la ESA (lanzada en septiembre de 2026) podrá usarse más adelante para bajar de escala.
-- En `docs/` están la hoja de ruta 2026–2028 y el artículo de Tang et al.

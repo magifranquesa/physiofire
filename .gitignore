@@ -71,3 +71,13 @@ docs/Anticipar grandes incendios en la Pen*nsula Ib*rica sequ*a, meteorolog*a y 
 data/processed/screening/*
 !data/processed/screening/README.md
 !data/processed/screening/shrubland/
+
+# Personal and working documents kept out of the public repository (they stay locally)
+CLAUDE.local.md
+docs/backlog.md
+docs/hoja_de_ruta_PHYSIOFIRE_2026-2028.md
+docs/literature/
+docs/reviews/
+docs/methods_draft_RSE.md
+docs/manuscript_review_2026-11-12.md
+docs/*.pdf
