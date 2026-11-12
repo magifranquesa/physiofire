@@ -102,8 +102,9 @@ inset <- ggplot() +
   geom_sf(data = iberia, fill = "grey45", colour = "white", linewidth = 0.1) +
   geom_sf(data = eu_box, fill = NA, colour = "black", linewidth = 0.3) +
   coord_sf(xlim = c(-12, 32), ylim = c(34, 62), expand = FALSE, crs = 4326) +
-  theme_void() + theme(panel.background = element_rect(fill = "white", colour = "black", linewidth = 0.3))
-pa <- pa + inset_element(inset, left = 0.70, bottom = 0.0, right = 1.0, top = 0.36, align_to = "panel")
+  theme_void() + theme(panel.background = element_rect(fill = "white", colour = NA),
+                       panel.border = element_rect(fill = NA, colour = "black", linewidth = 0.3))   # frame on top
+pa <- pa + inset_element(inset, left = 0.69, bottom = 0.01, right = 0.99, top = 0.37, align_to = "panel")
 
 # --- (b) north-west ------------------------------------------------------------------------------------------------
 pb <- ggplot() +
