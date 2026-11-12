@@ -111,7 +111,7 @@ Resultado en `docs/results_case2025.md`: SIF/APAR no se separa de los controles.
 - **AED (demanda evaporativa atmosférica):** variable atmosférica del análisis, en lugar del VPD. Integra temperatura, humedad, viento y radiación. Estimarla como evapotranspiración de referencia (ET0) con FAO-56 Penman-Monteith a partir de la fuente meteorológica elegida. Preguntar antes al investigador: su grupo (IPE, con AEMET) puede tener ya la AED calculada, y su método prevalece.
 - Nota: Tang et al. usan VPD, así que la comparación con su artículo no es directa; documentarlo en la discusión.
 - **FWI propio (análisis principal, decidido el 7 de noviembre de 2026):** sistema canadiense con ERA5-Land a 0,1° (valores a mediodía de temperatura, humedad relativa y viento, y precipitación de 24 h), con una implementación existente (xclim 1.0.0, aprobado el 7 de noviembre de 2026; constante del FFMC de Van Wagner, 1987, sin modificar). Motivo: con el FWI de 0,25°, el 7–16 % de los controles comparte celda con las celdas quemadas (0 % a 0,1°), lo que sesga la comparación a favor de SIF/APAR.
-- **FWI de referencia:** el de EFFIS / Copernicus EMS, como referencia operativa y prueba de sensibilidad. Nombre exacto del dataset **(verificar)**.
+- **FWI de referencia:** el de EFFIS / Copernicus EMS, como referencia operativa y prueba de sensibilidad. Dataset `cems-fire-historical-v1`, versión 4.1 (EWDS).
 
 ## Base científica: Tang et al. (2026)
 
@@ -155,7 +155,7 @@ Pasos de Tang que sirvieron de punto de partida (la versión vigente está en `d
 | NDVI, EVI | MOD09GA/MYD09GA v061 diario (principal); NBAR de MCD43A4 como sensibilidad | MCD43C4 no está en GEE |
 | Meteorología | ERA5-Land, AEMET (grupo), IPMA | Ver "Meteorología y FWI" |
 | FWI (principal) | Propio: sistema canadiense con ERA5-Land horario a 0,1° (xclim 1.0.0) | Validado con cffdrs; ver docs/data_sources.md |
-| FWI de referencia | EFFIS / Copernicus EMS en el EWDS (no en el CDS); dataset `cems-fire-historical-v1`, versión 4_1 | 0,25°, calculado con ERA5 a las 12 hora local; versión y acceso con la cuenta del CDS **(verificar)** |
+| FWI de referencia | EFFIS / Copernicus EMS en el EWDS (no en el CDS); dataset `cems-fire-historical-v1`, versión 4_1 | 0,25°, calculado con ERA5 a las 12 hora local; versión 4.1 confirmada por la petición a la API del EWDS (`system_version: 4_1`; el fichero no la lleva en sus metadatos); acceso con la clave del CDS |
 | Tipos de combustible | Mapa europeo de combustibles de FirEUrisk v2.0 (Aragoneses et al., 2023, ESSD 15:1287–1315; datos 10.21950/YABYCN, 1 km, hacia 2019, 20 tipos) | Clasificación principal: clase dominante a 0,05° para la lista corta, los estratos y el emparejamiento de controles |
 | Cobertura del suelo | CORINE Land Cover 2018 (GEE, 100 m) agregado a 0,05° | Apoyo y prueba de sensibilidad (R18). MCD12C1 deja de usarse (casi no asigna matorral en los incendios de 2025) |
 | Aridez | Global Aridity Index v3.1 (figshare 10.6084/m9.figshare.7504448.v7) | P/ET0 de 1970–2000, 30″. La v3 (figshare v5) tenía un error en la ET0 |
