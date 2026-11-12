@@ -91,7 +91,9 @@ def causal_sif_apar(cfg: dict, cells: pd.DataFrame, ds) -> None:
     (Fig. 2): fPAR composites ending on or after the fire's ignition removed BEFORE the daily interpolation, no
     persistence (epoch.sif_apar_causal with persist_days=None), so SIF/APAR is missing from the last valid composite
     centre onwards and from the ignition date on. Then the same screening and spike filter as build_series.
-    Drought cells keep the question 1 series."""
+    Controls keep SIF/APAR after the ignition: from the ignition date on they take the question 1 series (fPAR
+    interpolated without cut); the burned cell is masked from the ignition later anyway. Drought cells keep the
+    question 1 series."""
     from physiofire import epoch
     q, scfg, acfg = cfg["drought_q1"], cfg["sif_apar"], cfg["anomalies"]
     j = np.where(cells["case_type"].to_numpy() == "fire")[0]
@@ -119,6 +121,10 @@ def causal_sif_apar(cfg: dict, cells: pd.DataFrame, ds) -> None:
     new, _ = anomalies.spike_filter(new, int(acfg["spike_half_window"]), float(acfg["spike_k"]),
                                     int(acfg["spike_min_neighbours"]))
     vals = ds["sif_apar"].values.astype(float)
+    # controls: causal series up to the day before ignition, the question 1 series (no cut) from the ignition on
+    after = days[:, None] >= mark.astype("datetime64[D]")[None, :]
+    ctl = (cells["role"].to_numpy()[j] != "burned")[None, :]
+    new = np.where(after & ctl, vals[:, j], new)
     vals[:, j] = new
     ds["sif_apar"] = (("time", "cell"), vals.astype("f4"))
 
