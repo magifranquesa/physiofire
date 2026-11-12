@@ -1,0 +1,41 @@
+# Citation metadata (Citation File Format 1.2.0). GitHub shows a "Cite this repository" button from this file and
+# Zenodo reads it when a release is archived. Add the Zenodo concept DOI under `identifiers` after the first release,
+# and the journal article under `preferred-citation` once it is published.
+cff-version: 1.2.0
+message: "If you use this software or the derived datasets, please cite them as below."
+type: software
+title: "physiofire: satellite chlorophyll fluorescence (SIF/APAR), drought and fire-prone conditions in the Iberian Peninsula"
+abstract: >-
+  Analysis code, configuration and derived datasets for the study "Drought sensitivity versus anticipation:
+  satellite chlorophyll fluorescence and fire-prone conditions in the Iberian Peninsula": a matched comparison of
+  burned and unburned cells before the large fires of 2025, the drought accumulation time scale of SIF/APAR, NDVI
+  and EVI, and their response timing at drought onset, from TROPOMI SIF, MODIS, ERA5-Land and a daily SPEI at
+  0.05 degrees for 2018-2025. Analysis plans and decision criteria were fixed before execution (git tags
+  prereg-fire2025, prereg-timescale and prereg-onset).
+authors:
+  - family-names: Franquesa
+    given-names: Magí
+    affiliation: "Instituto Pirenaico de Ecología (IPE-CSIC), Zaragoza, Spain"
+repository-code: "https://github.com/magifranquesa/physiofire"
+license: MIT
+version: 1.0.0
+date-released: "2026-11-12"
+keywords:
+  - solar-induced chlorophyll fluorescence
+  - TROPOMI
+  - SIF/APAR
+  - drought
+  - SPEI
+  - fire danger
+  - Fire Weather Index
+  - Iberian Peninsula
+# identifiers:
+#   - type: doi
+#     value: 10.5281/zenodo.XXXXXXX   # Zenodo concept DOI (all versions), after the first release
+# preferred-citation:
+#   type: article
+#   title: "Drought sensitivity versus anticipation: satellite chlorophyll fluorescence and fire-prone conditions in the Iberian Peninsula"
+#   authors: [Franquesa M., Otón G., Chuvieco E., Torres-Vázquez M.Á., Vicente-Serrano S.M.]
+#   journal: ...
+#   year: ...
+#   doi: ...

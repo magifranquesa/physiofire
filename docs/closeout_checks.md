@@ -433,3 +433,21 @@ Comprobación: comparación de `explore_series.csv` antes de `9ac80b0` y despué
 - "Highest in the Portuguese fires" no era exacto: los máximos puntuales son españoles (Mombeltrán 2,35; Alburquerque y Cáceres 2,18). Lo que distingue a Portugal es la homogeneidad: todas las medianas ≥ 1,1.
 - Frase propuesta para la copia revisada del manuscrito: "Spring was wet in all 22 fires: the SPEI-3 of their burned cells (burned-fraction-weighted mean, as in Eq. (3)) had a positive median over April–May in every fire (0.2–2.1 in Spain and 1.1–1.8 in Portugal) and remained above zero on every day of these two months in 20 of them".
 - Dato adicional no incluido en la frase: el día de la ignición el SPEI-3 era negativo en los 22 incendios.
+
+## 15. Efecto mínimo detectable en el caso 2025 (12 de noviembre de 2026)
+
+**Motivo.** Para responder a la objeción de "ausencia de evidencia" en el análisis de incendios, el manuscrito (sección 3.1) indica qué diferencia habría detectado el diseño.
+
+**Fuente.** `data/processed/epoch/report2025_effects.csv` (`grid = fine`, `series = median_doy_trail15`, `group = all`, 22 incendios), días −15 a −1: semianchura del intervalo del 95 % de la diferencia quemadas−controles, `(ci_hi − ci_lo)/2`, media y máximo sobre los 15 días. Solo lectura; nada recalculado.
+
+| Variable | Media de la diferencia | Semianchura media | Semianchura máxima |
+| --- | --- | --- | --- |
+| SIF/APAR (sin persistencia, la principal) | +0,13 | 0,24 | 0,31 |
+| SIF/APAR (con persistencia) | +0,16 | 0,24 | 0,31 |
+| NDVI | +0,09 | 0,23 | 0,26 |
+| EVI | +0,06 | 0,24 | 0,26 |
+| FWI | 0,00 | 0,13 | 0,18 |
+| AED | +0,02 | 0,10 | 0,13 |
+
+- Por estratos, la semianchura media de SIF/APAR es 0,32 en matorral (15 incendios) y 0,29 en brezal (7); la del FWI, 0,13 y 0,23.
+- Lectura: una diferencia sostenida de 0,5 DE en la dirección esperada habría excluido el cero todos los días, así que el criterio prefijado estaba al alcance del diseño. Frase del manuscrito: "The 95% intervals of these differences had a mean half-width of 0.24 SD for SIF/APAR (maximum 0.31) and 0.13 SD for FWI over the same 15 days, so a sustained difference of the pre-specified 0.5 SD would have been detected."
