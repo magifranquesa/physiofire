@@ -410,3 +410,26 @@ Después del filtro:
 - **Valoración:** el valor eliminado en Benuza es claramente un pico, así que la versión actual es razonable. Se anota porque cambia visiblemente la S3_2 respecto a la versión anterior al 11 de noviembre.
 
 Comprobación: comparación de `explore_series.csv` antes de `9ac80b0` y después de `ce3c66e`; solo lectura.
+
+## 14. SPEI-3 de primavera en los 22 incendios de 2025 (12 de noviembre de 2026, *post hoc*, descriptivo)
+
+**Motivo.** La discusión del manuscrito decía "Spring was wet in most of the selected fires (SPEI-3 of 0 to +2 in April–May, highest in the Portuguese fires)", pero no existía ningún SPEI-3 calculado para los 22 incendios: solo para los 6 incendios exploratorios de la Fig. 3 y las S1–S5 (`data/interim/explore/explore_series.csv`).
+
+**Cálculo.** `Rscript R/fires_spei3_spring.R`: SPEI-90 diario de 2025 en las 140 celdas de ERA5-Land que contienen las 241 celdas (133 quemadas y 108 controles) de `data/processed/epoch/epoch_cells.csv`, con el mismo método, periodo de referencia (1991–2020) y recorte que la pregunta 1 (`R/spei_lib.R`, `R/q1_spei.R`). Por incendio y día, media de las celdas quemadas ponderada por la fracción quemada (B, como en la ecuación 3) y media simple de los controles (C). Salidas (fuera de git): `data/processed/epoch/spei3_fires_2025_daily.csv` y `spei3_fires_2025_spring.csv`. No es parte de ningún criterio prerregistrado y no cambia ningún resultado.
+
+**Resultado (abril–mayo de 2025, celdas quemadas).**
+
+| | España (15) | Portugal (7) |
+| --- | --- | --- |
+| Mediana por incendio | 0,20 a 2,13 | 1,14 a 1,79 |
+| Mínimo diario (mínimo entre incendios) | −0,09 | 0,72 |
+| Máximo diario (máximo entre incendios) | 2,35 | 2,03 |
+| Incendios con mediana > 0 | 15 | 7 |
+| Incendios con todos los días > 0 | 13 | 7 |
+| SPEI-3 el día de la ignición | −2,67 a −0,26 | −1,87 a −1,01 |
+
+- Los controles dan valores muy parecidos (la mediana de abril–mayo difiere de la de las celdas quemadas en 0,36 como máximo).
+- Los dos incendios con algún día ≤ 0 son Villablino (mínimo −0,05) y Peranzanes (−0,09), ambos en León.
+- "Highest in the Portuguese fires" no era exacto: los máximos puntuales son españoles (Mombeltrán 2,35; Alburquerque y Cáceres 2,18). Lo que distingue a Portugal es la homogeneidad: todas las medianas ≥ 1,1.
+- Frase propuesta para la copia revisada del manuscrito: "Spring was wet in all 22 fires: the SPEI-3 of their burned cells (burned-fraction-weighted mean, as in Eq. (3)) had a positive median over April–May in every fire (0.2–2.1 in Spain and 1.1–1.8 in Portugal) and remained above zero on every day of these two months in 20 of them".
+- Dato adicional no incluido en la frase: el día de la ignición el SPEI-3 era negativo en los 22 incendios.
