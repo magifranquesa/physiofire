@@ -81,3 +81,6 @@ docs/reviews/
 docs/methods_draft_RSE.md
 docs/manuscript_review_2026-11-12.md
 docs/*.pdf
+
+# Manuscript files (Word, cover letter): never versioned
+docs/manuscript/
